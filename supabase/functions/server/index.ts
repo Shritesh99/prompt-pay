@@ -321,12 +321,22 @@ app.get("/earnings/:address", async (c) => {
 });
 
 app.get("/auction", async (c) => {
-  const [[winnerId, price], board] = await Promise.all([readTopBid(), readBoard()]);
+  const board = await readBoard();
   const creatives = await sql`select campaign_id, text from creatives`;
   const textOf = (id: string) => creatives.find((r) => r.campaign_id === id)?.text ?? null;
+  // Only show campaigns that can actually serve (creative registered). This
+  // hides leftover on-chain test campaigns that were never given a creative.
+  const registered = board.filter((r) => textOf(r.id.toString()) !== null);
+  // Winner = highest-bid eligible campaign — matches what /ad would serve.
+  let winner: { campaignId: string; price: string } | null = null;
+  for (const r of registered) {
+    if (r.active && r.price > 0n && r.balance >= r.price && (!winner || r.price > BigInt(winner.price))) {
+      winner = { campaignId: r.id.toString(), price: r.price.toString() };
+    }
+  }
   return c.json({
-    winner: winnerId === 0n ? null : { campaignId: winnerId.toString(), price: price.toString() },
-    board: board.map((r) => ({
+    winner,
+    board: registered.map((r) => ({
       campaignId: r.id.toString(),
       advertiser: r.advertiser,
       pricePerSlot: r.price.toString(),

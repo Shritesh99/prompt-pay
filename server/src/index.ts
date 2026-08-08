@@ -184,10 +184,19 @@ app.get("/earnings/:address", async (c) => {
 // ---- dashboards ----
 
 app.get("/auction", async (c) => {
-  const [{ winnerId, price }, board] = await Promise.all([readTopBid(), readBoard()]);
+  const board = await readBoard();
+  // Only campaigns with a registered creative (i.e. that can actually serve),
+  // hiding leftover on-chain test campaigns.
+  const registered = board.filter((r) => store.getCreative(r.id.toString()));
+  let winner: { campaignId: string; price: string } | null = null;
+  for (const r of registered) {
+    if (r.active && r.price > 0n && r.balance >= r.price && (!winner || r.price > BigInt(winner.price))) {
+      winner = { campaignId: r.id.toString(), price: r.price.toString() };
+    }
+  }
   return c.json({
-    winner: winnerId === 0n ? null : { campaignId: winnerId.toString(), price: price.toString() },
-    board: board.map((r) => ({
+    winner,
+    board: registered.map((r) => ({
       campaignId: r.id.toString(),
       advertiser: r.advertiser,
       pricePerSlot: r.price.toString(),
