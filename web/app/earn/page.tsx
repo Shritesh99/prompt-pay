@@ -14,7 +14,8 @@ export default function EarnPage() {
   const serverBase = useServerBase();
   const { signer, useDevWallet } = useSigner();
 
-  const [wallet, setWallet] = useState<string | null>(null);
+  const [storedWallet, setStoredWallet] = useState<string | null>(null);
+  const [manual, setManual] = useState(false); // user chose to enter a different wallet
   const [walletInput, setWalletInput] = useState("");
   const [origin, setOrigin] = useState("https://promptpay-monad-blitz.netlify.app");
   const [claiming, setClaiming] = useState(false);
@@ -29,8 +30,13 @@ export default function EarnPage() {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
     const q = new URLSearchParams(window.location.search).get("wallet");
     const stored = q ?? localStorage.getItem(STORAGE_KEY);
-    if (stored && isAddress(stored)) setWallet(stored.toLowerCase());
+    if (stored && isAddress(stored)) setStoredWallet(stored.toLowerCase());
   }, []);
+
+  // A connected wallet is used automatically — no need to type it. An explicit
+  // "use a different wallet" flips `manual` so you can enter another address.
+  const connected = signer?.address?.toLowerCase() ?? null;
+  const wallet = storedWallet ?? (!manual ? connected : null);
 
   const earnings = usePoll<{ claimable: string; pendingUnits: number } | null>(
     async () => (wallet ? fetch(`${serverBase}/earnings/${wallet}`).then((r) => r.json()) : null),
@@ -47,7 +53,15 @@ export default function EarnPage() {
     if (!isAddress(addr)) return;
     const a = addr.toLowerCase();
     localStorage.setItem(STORAGE_KEY, a);
-    setWallet(a);
+    setStoredWallet(a);
+    setManual(false);
+  }
+
+  function useDifferentWallet() {
+    localStorage.removeItem(STORAGE_KEY);
+    setStoredWallet(null);
+    setManual(true);
+    setWalletInput("");
   }
 
   const curlCmd = `curl -fsSL ${origin}/install.sh | sh -s -- --wallet ${wallet ?? "0xYourWallet"}`;
@@ -171,9 +185,9 @@ export default function EarnPage() {
               </button>
             ) : (
               <>
-                <span>or</span>
+                <span>Connect your wallet (top right) to use it automatically, or</span>
                 <button onClick={useDevWallet} className="rounded-lg border border-zinc-700 px-3 py-1.5 hover:bg-zinc-900">
-                  Use a dev wallet
+                  use a dev wallet
                 </button>
               </>
             )}
@@ -188,14 +202,7 @@ export default function EarnPage() {
     <div className="space-y-6">
       <div className="flex items-baseline justify-between">
         <h1 className="text-2xl font-bold">Earn</h1>
-        <button
-          onClick={() => {
-            localStorage.removeItem(STORAGE_KEY);
-            setWallet(null);
-            setWalletInput("");
-          }}
-          className="text-xs text-zinc-500 underline hover:text-zinc-300"
-        >
+        <button onClick={useDifferentWallet} className="text-xs text-zinc-500 underline hover:text-zinc-300">
           ← use a different wallet
         </button>
       </div>
