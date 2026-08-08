@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { createWalletClient, http } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { vaultAbi } from "../../lib/abis";
-import { activeChain } from "../../lib/chains";
+import { activeChain, explorerTx } from "../../lib/chains";
 import { fmtUsdc, publicClient, useDeployment, usePoll, useServerBase } from "../../lib/hooks";
 
 const STORAGE_KEY = "promptpay.agentKey";
@@ -14,6 +14,7 @@ export default function EarnPage() {
   const [keyInput, setKeyInput] = useState("");
   const [claiming, setClaiming] = useState(false);
   const [claimMsg, setClaimMsg] = useState<string | null>(null);
+  const [claimTx, setClaimTx] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -47,6 +48,7 @@ export default function EarnPage() {
     if (!agentKey || !deployment || !account) return;
     setClaiming(true);
     setClaimMsg(null);
+    setClaimTx(null);
     try {
       // The agent wallet needs native gas to sign claimAll(). Top it up, then
       // WAIT until the balance actually lands before claiming — the faucet tx
@@ -78,7 +80,8 @@ export default function EarnPage() {
         functionName: "claimAll",
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      setClaimMsg(`Claimed! tx ${hash}`);
+      setClaimTx(hash);
+      setClaimMsg("Claimed!");
     } catch (err) {
       setClaimMsg(`Claim failed: ${(err as Error).message}`);
     } finally {
@@ -150,7 +153,26 @@ export default function EarnPage() {
           </div>
           {claimMsg && (
             <p className="break-all rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-sm text-zinc-300">
-              {claimMsg}
+              <span className={claimTx ? "text-emerald-400" : ""}>{claimMsg}</span>
+              {claimTx &&
+                (explorerTx(claimTx) ? (
+                  <>
+                    {" "}
+                    <a
+                      href={explorerTx(claimTx)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-violet-400 underline hover:text-violet-300"
+                    >
+                      View on MonadScan ↗
+                    </a>
+                    <span className="ml-2 font-mono text-xs text-zinc-500">
+                      {claimTx.slice(0, 10)}…{claimTx.slice(-8)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="ml-1 font-mono text-xs">{claimTx}</span>
+                ))}
             </p>
           )}
 
