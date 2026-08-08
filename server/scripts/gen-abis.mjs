@@ -27,6 +27,8 @@ if (existsSync(path.join(root, "web"))) {
   mkdirSync(webLib, { recursive: true });
   targets.push(path.join(webLib, "abis.ts"));
 }
+const fnDir = path.join(root, "supabase/functions/server");
+if (existsSync(fnDir)) targets.push(path.join(fnDir, "abis.ts"));
 for (const t of targets) {
   writeFileSync(t, ts);
   console.log("wrote", path.relative(root, t));
