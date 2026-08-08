@@ -15,9 +15,6 @@ const USDC_DRIP = 100_000_000n; // 100 pUSDC
 const GAS_DRIP = parseEther(NETWORK === "monad" ? "0.05" : "0.5");
 const usdcAbi = parseAbi(["function mint(address to, uint256 amount)"]);
 
-// naive in-memory rate limit: one drip per address per minute
-const lastDrip = new Map<string, number>();
-
 export async function POST(req: Request) {
   if (!key) return NextResponse.json({ error: "faucet_not_configured" }, { status: 503 });
   const body = (await req.json().catch(() => null)) as { address?: string; gasOnly?: boolean } | null;
@@ -25,11 +22,6 @@ export async function POST(req: Request) {
   if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
     return NextResponse.json({ error: "bad_address" }, { status: 400 });
   }
-  const last = lastDrip.get(address.toLowerCase()) ?? 0;
-  if (Date.now() - last < 60_000) {
-    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
-  }
-  lastDrip.set(address.toLowerCase(), Date.now());
 
   const deployment = loadDeployment();
   const account = privateKeyToAccount(key);
