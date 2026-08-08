@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// PromptPay CLI — earn USDC in Claude Code's status line.
-//   promptpay setup [--key 0x…] [--server URL]   provision agent + install surfaces + start daemon
+// PromptPay CLI — earn USDC while your AI coding agent works.
+//   promptpay setup [--key 0x…] [--server URL]   Claude Code: status-line + spinner ad + daemon
 //   promptpay start | stop | status | uninstall
+//   promptpay codex-setup [--key 0x…] [--server URL]   Codex: sponsored notify hook (earns per turn)
+//   promptpay codex-uninstall
 import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -9,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { PATHS, ensureHome, loadConfig, saveConfig } from "../src/config.mjs";
 import { installSettings, restoreSettings } from "../src/settings.mjs";
+import { installCodexNotify, restoreCodexNotify, CODEX_CONFIG } from "../src/codex.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cmd = process.argv[2];
@@ -111,7 +114,35 @@ switch (cmd) {
     break;
   }
 
+  case "codex-setup": {
+    ensureHome();
+    const key = flag("key") ?? loadConfig()?.agentPrivateKey ?? generatePrivateKey();
+    if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
+      console.error("--key must be a 0x-prefixed 32-byte hex private key");
+      process.exit(1);
+    }
+    const serverBase = flag("server") ?? loadConfig()?.serverBase ?? "http://localhost:4021";
+    saveConfig({ agentPrivateKey: key, serverBase });
+    const notifyScript = path.join(here, "../src/codex-notify.mjs");
+    installCodexNotify(notifyScript);
+    const address = privateKeyToAccount(key).address;
+    console.log(`installed Codex notify hook → ${CODEX_CONFIG}`);
+    console.log(`agent:  ${address}`);
+    console.log(`server: ${serverBase}`);
+    console.log("\nRun `codex`, complete a task, and a sponsored notification appears each");
+    console.log("turn — earning an impression. Watch it: promptpay status");
+    console.log("Undo: promptpay codex-uninstall");
+    break;
+  }
+
+  case "codex-uninstall":
+    restoreCodexNotify();
+    console.log(`removed PromptPay notify hook from ${CODEX_CONFIG}`);
+    break;
+
   default:
-    console.log("usage: promptpay <setup|start|stop|status|uninstall> [--key 0x…] [--server URL]");
+    console.log(
+      "usage: promptpay <setup|start|stop|status|uninstall|codex-setup|codex-uninstall> [--key 0x…] [--server URL]"
+    );
     process.exit(cmd ? 1 : 0);
 }

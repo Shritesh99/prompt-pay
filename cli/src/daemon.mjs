@@ -2,10 +2,10 @@
 // (status line file + Claude Code spinnerVerbs), and reports impressions —
 // but ONLY while the statusline heartbeat proves an ad is actually on screen.
 import { readFileSync, writeFileSync } from "node:fs";
-import { keccak256, toHex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { PATHS, loadConfig } from "./config.mjs";
 import { updateSpinnerVerb } from "./settings.mjs";
+import { signedReport } from "./report.mjs";
 
 // Cadence knobs — env-overridable so a demo can bill fast. Defaults are the
 // "honest" production values (one impression per 15s rotation).
@@ -57,43 +57,6 @@ function writeAdFile() {
   try {
     writeFileSync(PATHS.currentAd, JSON.stringify(payload));
   } catch {}
-}
-
-async function signedReport(type) {
-  const body = JSON.stringify({
-    campaignId: currentAd.campaignId,
-    type,
-    surface: "claude-cli-statusline",
-  });
-  const post = (headers) =>
-    fetch(`${serverBase}/report`, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...headers },
-      body,
-    });
-
-  const bare = await post({});
-  if (bare.status !== 402) return bare.json();
-  const { challenge } = await bare.json();
-
-  const message = [
-    "PromptPay Report v1",
-    `domain: ${challenge.domain}`,
-    `uri: ${challenge.uri}`,
-    `agent: ${account.address.toLowerCase()}`,
-    `nonce: ${challenge.nonce}`,
-    `issuedAt: ${challenge.issuedAt}`,
-    `body: ${keccak256(toHex(body))}`,
-  ].join("\n");
-  const signature = await account.signMessage({ message });
-
-  const signed = await post({
-    "x-pp-agent": account.address,
-    "x-pp-nonce": challenge.nonce,
-    "x-pp-issued-at": challenge.issuedAt,
-    "x-pp-signature": signature,
-  });
-  return signed.json();
 }
 
 async function tick() {
@@ -155,7 +118,13 @@ async function tick() {
     impressionReportedForRotation = true;
     lastReportAt = Date.now();
     try {
-      const out = await signedReport("impression");
+      const out = await signedReport({
+        serverBase,
+        account,
+        campaignId: currentAd.campaignId,
+        type: "impression",
+        surface: "claude-cli-statusline",
+      });
       if (out.credited) console.log(`[daemon] impression credited (campaign ${currentAd.campaignId})`);
       else console.log(`[daemon] impression not credited:`, JSON.stringify(out));
     } catch (err) {
