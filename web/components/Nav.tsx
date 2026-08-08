@@ -10,6 +10,7 @@ const links = [
   { href: "/advertise/new", label: "Advertise" },
   { href: "/earn", label: "Earn" },
   { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/pitch", label: "Pitch" },
 ];
 
 export function Nav() {
