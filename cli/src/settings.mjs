@@ -5,10 +5,11 @@
 // uninstall; nothing else in settings.json is touched.
 import { homedir } from "node:os";
 import path from "node:path";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { PATHS, ensureHome } from "./config.mjs";
 
-const SETTINGS = path.join(homedir(), ".claude", "settings.json");
+const CLAUDE_DIR = path.join(homedir(), ".claude");
+const SETTINGS = path.join(CLAUDE_DIR, "settings.json");
 const ABSENT = "__promptpay_absent__";
 const MANAGED_KEYS = ["statusLine", "spinnerVerbs"];
 
@@ -31,6 +32,7 @@ function backupOnce(settings) {
 }
 
 export function installSettings(adText) {
+  mkdirSync(CLAUDE_DIR, { recursive: true }); // Codex-only / fresh machines may lack ~/.claude
   const settings = readJson(SETTINGS, {});
   backupOnce(settings);
   settings.statusLine = {
