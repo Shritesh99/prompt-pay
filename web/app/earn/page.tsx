@@ -177,16 +177,35 @@ export default function EarnPage() {
           )}
 
           <div className="rounded-xl border border-zinc-800 p-6">
-            <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-zinc-500">
-              Set up the Claude Code earner
+            <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-zinc-500">
+              Earn in your AI coding agent
             </h2>
-            <pre className="overflow-x-auto rounded-lg bg-zinc-900 p-4 text-sm text-zinc-300">
-              {`node cli/bin/promptpay.mjs setup --key ${agentKey} --server ${serverBase}`}
-            </pre>
-            <p className="mt-2 text-xs text-zinc-500">
-              Then open a new <code>claude</code> session — the ad shows in the status line and the
-              thinking verb, and impressions credit to this agent.
+            <p className="mb-4 text-xs text-zinc-500">
+              Both surfaces credit impressions to this agent key. Run the setup command from the
+              PromptPay repo, then use your agent as usual.
             </p>
+
+            <div className="mb-3">
+              <p className="mb-1 text-sm font-medium text-zinc-200">Claude Code</p>
+              <pre className="overflow-x-auto rounded-lg bg-zinc-900 p-4 text-sm text-zinc-300">
+                {`node cli/bin/promptpay.mjs setup --key ${agentKey} --server ${serverBase}`}
+              </pre>
+              <p className="mt-2 text-xs text-zinc-500">
+                Open a new <code>claude</code> session — the ad shows in the status line and the
+                thinking verb, earning while the session is open.
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-1 text-sm font-medium text-zinc-200">Codex CLI</p>
+              <pre className="overflow-x-auto rounded-lg bg-zinc-900 p-4 text-sm text-zinc-300">
+                {`node cli/bin/promptpay.mjs codex-setup --key ${agentKey} --server ${serverBase}`}
+              </pre>
+              <p className="mt-2 text-xs text-zinc-500">
+                Run <code>codex</code> — each completed turn pops a sponsored notification and earns
+                an impression. Undo anytime with <code>codex-uninstall</code>.
+              </p>
+            </div>
           </div>
 
           <div className="rounded-xl border border-zinc-800 p-6">

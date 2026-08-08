@@ -67,7 +67,7 @@ export default function Landing() {
       <section className="grid gap-4 sm:grid-cols-3">
         {[
           ["1. Advertisers escrow USDC", "Fund a campaign, commit the creative on-chain, and bid for the spinner slot in an English auction."],
-          ["2. Devs show the ad", "A one-command CLI puts the winning ad in Claude Code's status line and thinking verb. Signed impressions, no bots."],
+          ["2. Devs show the ad", "A one-command CLI puts the winning ad in Claude Code (status line + thinking verb) or Codex (per-turn notification). Signed impressions, no bots."],
           ["3. Everyone settles on Monad", "An oracle batches events on-chain: 50% to the earner, instantly claimable. Sub-second finality."],
         ].map(([title, body]) => (
           <div key={title} className="rounded-xl border border-zinc-800 p-5">
