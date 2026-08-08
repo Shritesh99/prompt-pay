@@ -2,6 +2,27 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+function Node({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
+  return (
+    <div
+      className={`rounded-xl border px-5 py-3 text-center text-sm ${
+        accent ? "border-violet-600/70 bg-violet-950/30 text-violet-100" : "border-zinc-700 bg-zinc-900/60 text-zinc-200"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Arrow({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center py-1 text-zinc-500">
+      <span className="text-[11px]">{label}</span>
+      <span className="leading-none">↓</span>
+    </div>
+  );
+}
+
 const SLIDES = [
   // 1 — Hero / problem
   <div key="1" className="space-y-6 text-center">
@@ -41,8 +62,26 @@ const SLIDES = [
     </p>
   </div>,
 
-  // 3 — Live + CTA
-  <div key="3" className="space-y-8">
+  // 3 — Architecture / the money loop
+  <div key="diagram" className="space-y-4">
+    <h2 className="text-center text-4xl font-bold">The money loop</h2>
+    <div className="mx-auto max-w-xl">
+      <Node>Advertiser</Node>
+      <Arrow label="escrow USDC + bid in the on-chain auction" />
+      <Node accent>Monad — CampaignVault · AdAuction · PayoutSettlement</Node>
+      <Arrow label="ad-server reads the winning bid" />
+      <Node>Ad-server — Supabase Edge Function + Postgres</Node>
+      <Arrow label="serves the winning ad" />
+      <Node>Claude Code · Codex — ad in the thinking spinner</Node>
+      <Arrow label="signed impression (EIP-191) · verify · per-wallet cap · enrolled?" />
+      <Node accent>Oracle settles on Monad — 50% dev / 50% treasury</Node>
+      <Arrow label="claim any time" />
+      <Node>Developer wallet — USDC</Node>
+    </div>
+  </div>,
+
+  // 4 — Live + CTA
+  <div key="live" className="space-y-8">
     <h2 className="text-center text-4xl font-bold">
       Live on <span className="text-violet-400">Monad testnet</span>
     </h2>
