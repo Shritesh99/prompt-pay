@@ -125,6 +125,12 @@ export default function EarnPage() {
             </button>
           </div>
           <p className="text-xs text-zinc-600">Stored only in this browser&apos;s localStorage.</p>
+          <div className="rounded-lg border border-amber-900/60 bg-amber-950/30 p-3 text-xs text-amber-300/90">
+            <span className="font-medium">This is a disposable earner key</span> — it only signs
+            impression reports and holds your testnet earnings. It is <span className="font-medium">not</span>{" "}
+            your main wallet. Never paste a real wallet&apos;s seed phrase or private key here. (A production
+            version keeps this signing key on your device and pays out to a separate wallet.)
+          </div>
         </div>
       ) : (
         <>
@@ -182,7 +188,9 @@ export default function EarnPage() {
             </h2>
             <p className="mb-4 text-xs text-zinc-500">
               Both surfaces credit impressions to this agent key. Run the setup command from the
-              PromptPay repo, then use your agent as usual.
+              PromptPay repo, then use your agent as usual. The key here is a disposable signing key
+              (not your wallet) — <code>promptpay setup</code> with no <code>--key</code> just
+              generates one locally instead.
             </p>
 
             <div className="mb-3">

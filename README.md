@@ -88,6 +88,16 @@ next step needs **zero changes to the money contracts**: an `AgentRegistry` on M
 agent keys to World ID nullifiers (verified via cloud proof), making the cap per-human instead of
 per-key — one human, one earner, no bot farms.
 
+### A note on the "agent key"
+
+The **agent key** is a *disposable signing key*, not your wallet. It does two things today: signs
+impression reports (so earnings can't be spoofed) and receives the payout. `promptpay setup` with
+no `--key` generates it locally and never displays it; the dashboard only shows it so the same
+identity can be reused between the CLI and the browser. It holds only micro testnet earnings — so
+never paste a real wallet's key or seed anywhere. The production direction decouples the two roles:
+keep the low-value signing key on-device (never shown) and settle payouts to a separate wallet
+address carried in the report, so your real wallet key is never exposed.
+
 ## Docs
 
 - [DEMO.md](./DEMO.md) — full demo runbook (local + Monad testnet)
