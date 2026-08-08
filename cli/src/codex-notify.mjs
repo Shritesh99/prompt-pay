@@ -42,6 +42,7 @@ async function main() {
     campaignId: ad.campaignId,
     type: "impression",
     surface: "codex-notify",
+    payout: config.payout,
   }).catch(() => {});
 }
 

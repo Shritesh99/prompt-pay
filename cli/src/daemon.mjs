@@ -101,7 +101,7 @@ async function tick() {
   if (Date.now() - lastEarningsAt > EARNINGS_POLL_MS) {
     lastEarningsAt = Date.now();
     try {
-      const e = await (await fetch(`${serverBase}/earnings/${account.address}`)).json();
+      const e = await (await fetch(`${serverBase}/earnings/${config.payout ?? account.address}`)).json();
       earnedUsd = (Number(e.claimable) / 1e6).toFixed(4);
       writeAdFile();
     } catch {}
@@ -124,6 +124,7 @@ async function tick() {
         campaignId: currentAd.campaignId,
         type: "impression",
         surface: "claude-cli-statusline",
+        payout: config.payout,
       });
       if (out.credited) console.log(`[daemon] impression credited (campaign ${currentAd.campaignId})`);
       else console.log(`[daemon] impression not credited:`, JSON.stringify(out));

@@ -2,6 +2,7 @@ import {
   createPublicClient,
   createWalletClient,
   defineChain,
+  fallback,
   http,
   type Address,
   type Hex,
@@ -9,6 +10,23 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { config } from "./config.js";
 import { vaultAbi, auctionAbi, settlementAbi } from "./abis.js";
+
+// Monad's public RPC rate-limits a polling server, so read across a couple of
+// endpoints with retries. Extra URLs can be added via RPC_FALLBACKS (csv).
+const MONAD_FALLBACKS = [
+  "https://rpc.ankr.com/monad_testnet",
+  "https://rpc-testnet.monadinfra.com",
+];
+const rpcUrls = [
+  config.rpcUrl,
+  ...(process.env.RPC_FALLBACKS?.split(",").map((s) => s.trim()).filter(Boolean) ??
+    (config.network === "monad" ? MONAD_FALLBACKS : [])),
+].filter((u, i, a) => u && a.indexOf(u) === i);
+
+const transport = fallback(
+  rpcUrls.map((url) => http(url, { retryCount: 3, retryDelay: 300 })),
+  { rank: false }
+);
 
 export const chain = defineChain({
   id: config.chainId,
@@ -20,13 +38,13 @@ export const chain = defineChain({
   rpcUrls: { default: { http: [config.rpcUrl] } },
 });
 
-export const publicClient = createPublicClient({ chain, transport: http(config.rpcUrl) });
+export const publicClient = createPublicClient({ chain, transport });
 
 export const oracleAccount = privateKeyToAccount(config.oraclePrivateKey);
 export const oracleClient = createWalletClient({
   account: oracleAccount,
   chain,
-  transport: http(config.rpcUrl),
+  transport,
 });
 
 export type BoardRow = {

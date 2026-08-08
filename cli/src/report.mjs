@@ -3,8 +3,8 @@
 // 402 challenge -> EIP-191 signature -> retry flow.
 import { keccak256, toHex } from "viem";
 
-export async function signedReport({ serverBase, account, campaignId, type, surface, timeoutMs = 8000 }) {
-  const body = JSON.stringify({ campaignId, type, surface });
+export async function signedReport({ serverBase, account, campaignId, type, surface, payout, timeoutMs = 8000 }) {
+  const body = JSON.stringify(payout ? { campaignId, type, surface, payout } : { campaignId, type, surface });
   const signal = AbortSignal.timeout ? AbortSignal.timeout(timeoutMs) : undefined;
   const post = (headers) =>
     fetch(`${serverBase}/report`, {

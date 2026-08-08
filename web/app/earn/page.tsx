@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { createWalletClient, http } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { useAccount } from "wagmi";
 import { vaultAbi } from "../../lib/abis";
 import { activeChain, explorerTx } from "../../lib/chains";
 import { fmtUsdc, publicClient, useDeployment, usePoll, useServerBase } from "../../lib/hooks";
@@ -93,9 +94,35 @@ export default function EarnPage() {
     (e) => account && e.earner.toLowerCase() === account.address.toLowerCase()
   );
 
+  const { address: connectedWallet } = useAccount();
+  const [origin, setOrigin] = useState("https://promptpay-monad-blitz.netlify.app");
+  useEffect(() => {
+    if (typeof window !== "undefined") setOrigin(window.location.origin);
+  }, []);
+  const curlWallet = connectedWallet ?? account?.address ?? "0xYourWallet";
+  const curlCmd = `curl -fsSL ${origin}/install.sh | sh -s -- --wallet ${curlWallet}`;
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Earn</h1>
+
+      <div className="rounded-xl border border-violet-800/60 bg-violet-950/20 p-6">
+        <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-violet-300">
+          Quick install — one line
+        </h2>
+        <p className="mb-3 text-xs text-zinc-400">
+          Sets up the earner for Claude Code and pays out to your wallet. Pass{" "}
+          <code>--agent both</code> to also enable Codex. A signing key is generated locally and
+          never leaves your machine — only your <span className="text-zinc-200">public wallet</span>{" "}
+          is in the command.
+        </p>
+        <CopyBox text={curlCmd} />
+        {!connectedWallet && (
+          <p className="mt-2 text-xs text-zinc-500">
+            Connect your wallet (top right) to drop your address into the command automatically.
+          </p>
+        )}
+      </div>
 
       {!account ? (
         <div className="space-y-4 rounded-xl border border-zinc-800 p-6">
@@ -247,6 +274,31 @@ export default function EarnPage() {
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+function CopyBox({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="flex items-stretch gap-2">
+      <pre className="flex-1 overflow-x-auto rounded-lg bg-zinc-950 p-3 text-xs text-zinc-200 ring-1 ring-zinc-800">
+        {text}
+      </pre>
+      <button
+        onClick={() => {
+          navigator.clipboard?.writeText(text).then(
+            () => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            },
+            () => {}
+          );
+        }}
+        className="shrink-0 rounded-lg border border-zinc-700 px-3 text-xs hover:bg-zinc-900"
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
     </div>
   );
 }

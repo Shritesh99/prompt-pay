@@ -22,6 +22,18 @@ function flag(name) {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
+// Optional payout wallet (public address). Earnings settle here instead of to
+// the local signing key. Kept in config so both surfaces report it.
+function walletFlag() {
+  const w = flag("wallet") ?? loadConfig()?.payout;
+  if (w === undefined) return undefined;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(w)) {
+    console.error("--wallet must be a 0x-prefixed 20-byte address");
+    process.exit(1);
+  }
+  return w.toLowerCase();
+}
+
 function daemonPid() {
   try {
     const pid = Number(readFileSync(PATHS.pid, "utf8"));
@@ -61,12 +73,14 @@ switch (cmd) {
       process.exit(1);
     }
     const serverBase = flag("server") ?? loadConfig()?.serverBase ?? "http://localhost:4021";
-    saveConfig({ agentPrivateKey: key, serverBase });
+    const payout = walletFlag();
+    saveConfig({ agentPrivateKey: key, serverBase, payout });
     copyFileSync(path.join(here, "../src/statusline.mjs"), PATHS.statusline);
     installSettings("promptpay · waiting for ads");
     startDaemon();
     const address = privateKeyToAccount(key).address;
-    console.log(`\nagent: ${address}`);
+    console.log(`\nagent (signing key): ${address}`);
+    console.log(`payout: ${payout ?? address}${payout ? "" : "  (no --wallet given; earnings go to the signing key)"}`);
     console.log(`server: ${serverBase}`);
     console.log("\nOpen a NEW `claude` session — the ad appears in the status line");
     console.log("and as the thinking verb. `promptpay status` shows earnings.");
@@ -88,7 +102,9 @@ switch (cmd) {
       break;
     }
     const address = privateKeyToAccount(config.agentPrivateKey).address;
+    const payoutAddr = config.payout ?? address;
     console.log(`agent:  ${address}`);
+    console.log(`payout: ${payoutAddr}`);
     console.log(`server: ${config.serverBase}`);
     console.log(`daemon: ${daemonPid() ? `running (pid ${daemonPid()})` : "stopped"}`);
     try {
@@ -96,7 +112,7 @@ switch (cmd) {
       if (ad.adText) console.log(`ad:     "${ad.adText}" → ${ad.clickUrl}`);
     } catch {}
     try {
-      const e = await (await fetch(`${config.serverBase}/earnings/${address}`)).json();
+      const e = await (await fetch(`${config.serverBase}/earnings/${payoutAddr}`)).json();
       console.log(`earned: $${(Number(e.claimable) / 1e6).toFixed(4)} USDC claimable (+${e.pendingUnits} units pending settlement)`);
     } catch {
       console.log("earned: (server unreachable)");
@@ -122,12 +138,14 @@ switch (cmd) {
       process.exit(1);
     }
     const serverBase = flag("server") ?? loadConfig()?.serverBase ?? "http://localhost:4021";
-    saveConfig({ agentPrivateKey: key, serverBase });
+    const payout = walletFlag();
+    saveConfig({ agentPrivateKey: key, serverBase, payout });
     const notifyScript = path.join(here, "../src/codex-notify.mjs");
     installCodexNotify(notifyScript);
     const address = privateKeyToAccount(key).address;
     console.log(`installed Codex notify hook → ${CODEX_CONFIG}`);
-    console.log(`agent:  ${address}`);
+    console.log(`agent (signing key): ${address}`);
+    console.log(`payout: ${payout ?? address}`);
     console.log(`server: ${serverBase}`);
     console.log("\nRun `codex`, complete a task, and a sponsored notification appears each");
     console.log("turn — earning an impression. Watch it: promptpay status");

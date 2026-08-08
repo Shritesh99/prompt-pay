@@ -114,6 +114,10 @@ const reportBody = z.object({
   campaignId: z.string().regex(/^\d+$/),
   type: z.enum(["impression", "click"]),
   surface: z.string().max(64).optional(),
+  // Optional payout address: the signer authenticates the report, but earnings
+  // are credited here (the earner's real wallet). Bound into the signature via
+  // the body hash, so it can't be tampered with.
+  payout: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
 });
 
 app.post("/report", async (c) => {
@@ -134,10 +138,15 @@ app.post("/report", async (c) => {
 
   const verdict = await verifyReport({ agent, nonce, issuedAt, signature, rawBody });
   if (!verdict.ok) return c.json({ error: verdict.error }, 401);
-  const { agent: earner, humanId } = verdict.verified;
+  const { agent: signer, humanId } = verdict.verified;
 
-  const { campaignId, type, surface } = parsed.data;
+  const { campaignId, type, surface, payout } = parsed.data;
   if (!store.getCreative(campaignId)) return c.json({ error: "unknown_campaign" }, 404);
+
+  // The signer proves the impression; the payout wallet (if given) is who gets
+  // paid. The daily cap stays keyed on humanId (the signing key), so declaring
+  // a payout can't be used to exceed a cap.
+  const earner = payout ?? signer;
 
   const units = type === "click" ? 50 : 1;
   const accepted = store.acceptUnits(humanId, units, config.perKeyDailyCap);
