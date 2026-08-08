@@ -40,8 +40,11 @@ const wallet = createWalletClient({ account, chain, transport: http(rpcUrl) });
 
 const TEXT = process.env.AD_TEXT ?? "Ship it on Monad - 10,000 TPS, full EVM";
 const CLICK_URL = process.env.AD_URL ?? "https://monad.xyz";
-const BUDGET = 100_000_000n; // 100 pUSDC
-const PRICE_PER_SLOT = 2_000_000n; // 2 pUSDC per 1000 impressions
+// pUSDC has 6 decimals. PRICE_PER_SLOT is per 1000 impressions, so one
+// impression earns the earner PRICE_PER_SLOT/2000. For a demo, bump the price
+// (via PRICE_PER_SLOT env) so a single impression shows a visible amount.
+const BUDGET = BigInt(process.env.BUDGET ?? 100_000_000n); // default 100 pUSDC
+const PRICE_PER_SLOT = BigInt(process.env.PRICE_PER_SLOT ?? 2_000_000n); // default 2 pUSDC/1000 impr
 
 async function tx(request) {
   const hash = await wallet.writeContract(request);

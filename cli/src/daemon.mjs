@@ -7,11 +7,14 @@ import { privateKeyToAccount } from "viem/accounts";
 import { PATHS, loadConfig } from "./config.mjs";
 import { updateSpinnerVerb } from "./settings.mjs";
 
-const TICK_MS = 5_000;
-const ROTATION_MS = 15_000; // hold each ad so billing is honest
-const HEARTBEAT_FRESH_MS = 12_000; // statusline rendered recently = visible
-const MIN_REPORT_GAP_MS = 5_000;
-const EARNINGS_POLL_MS = 15_000;
+// Cadence knobs — env-overridable so a demo can bill fast. Defaults are the
+// "honest" production values (one impression per 15s rotation).
+const num = (name, def) => Number(process.env[name] ?? def);
+const TICK_MS = num("PP_TICK_MS", 5_000);
+const ROTATION_MS = num("PP_ROTATION_MS", 15_000); // hold each ad so billing is honest
+const HEARTBEAT_FRESH_MS = num("PP_HEARTBEAT_FRESH_MS", 12_000); // statusline rendered recently = visible
+const MIN_REPORT_GAP_MS = num("PP_MIN_REPORT_GAP_MS", 5_000);
+const EARNINGS_POLL_MS = num("PP_EARNINGS_POLL_MS", 15_000);
 
 const config = loadConfig();
 if (!config?.agentPrivateKey) {

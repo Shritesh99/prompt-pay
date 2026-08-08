@@ -14,6 +14,17 @@ source scripts/env-key.sh
 SITE_ID="${NETLIFY_SITE_ID:-603abff3-bee0-43ef-a02e-fc7e2cef8e23}"
 SERVER_PORT="${PORT:-4021}"
 
+# --- demo economics & cadence -------------------------------------------------
+# Make a single impression worth a visible amount and bill fast, so a demo
+# doesn't need dozens of impressions. One impression earns PRICE_PER_SLOT/2000:
+# 1000 pUSDC/slot -> $0.50 per impression (earner's 50% share). 5000 pUSDC
+# budget = ~5000 impressions of runway.
+DEMO_PRICE_PER_SLOT="${PRICE_PER_SLOT:-1000000000}"   # 1000 pUSDC per 1000 impressions
+DEMO_BUDGET="${BUDGET:-5000000000}"                   # 5000 pUSDC
+# server-side: short dwell + fast settlement so earnings appear in seconds
+export VIEW_THRESHOLD_MS="${VIEW_THRESHOLD_MS:-1000}"
+export SETTLE_INTERVAL_MS="${SETTLE_INTERVAL_MS:-5000}"
+
 cleanup() {
   echo; echo "[tunnel] stopping…"
   [[ -n "${TUNNEL_PID:-}" ]] && kill "$TUNNEL_PID" 2>/dev/null || true
@@ -23,7 +34,8 @@ trap cleanup EXIT INT TERM
 
 echo "[tunnel] starting ad-server on :$SERVER_PORT (Monad testnet)"
 lsof -ti :$SERVER_PORT | xargs kill 2>/dev/null || true
-( cd server && PROMPTPAY_NETWORK=monad ORACLE_PRIVATE_KEY="$PRIVATE_KEY" PORT=$SERVER_PORT pnpm dev ) &
+( cd server && PROMPTPAY_NETWORK=monad ORACLE_PRIVATE_KEY="$PRIVATE_KEY" PORT=$SERVER_PORT \
+    VIEW_THRESHOLD_MS="$VIEW_THRESHOLD_MS" SETTLE_INTERVAL_MS="$SETTLE_INTERVAL_MS" pnpm dev ) &
 SERVER_PID=$!
 for i in $(seq 1 30); do curl -sf "localhost:$SERVER_PORT/health" >/dev/null && break; sleep 0.5; done
 
@@ -45,16 +57,23 @@ echo "[tunnel] public ad-server: $URL"
 echo "[tunnel] pointing Netlify site at it (SERVER_BASE, no redeploy needed)"
 ( cd /tmp && netlify env:set SERVER_BASE "$URL" --site "$SITE_ID" >/dev/null )
 
-# seed a demo campaign if none is live yet
+# seed a demo campaign if none is live yet (high value so it dominates the
+# bid-weighted rotation and one impression is clearly visible)
 if [[ "$(curl -s "localhost:$SERVER_PORT/ad" | grep -c '"ad":null' || true)" != "0" ]]; then
-  echo "[tunnel] seeding a demo campaign"
-  SEEDER_PRIVATE_KEY="$PRIVATE_KEY" node server/scripts/seed-demo.mjs monad || true
+  echo "[tunnel] seeding a demo campaign (\$0.50/impression to the earner)"
+  SEEDER_PRIVATE_KEY="$PRIVATE_KEY" PRICE_PER_SLOT="$DEMO_PRICE_PER_SLOT" BUDGET="$DEMO_BUDGET" \
+    node server/scripts/seed-demo.mjs monad || true
 fi
 
 echo
 echo "  Live site:  https://promptpay-monad-blitz.netlify.app"
 echo "  Ad-server:  $URL  (via this laptop)"
-echo "  CLI earner: node cli/bin/promptpay.mjs setup --server $URL"
+echo "  Economics:  \$0.50 earned per impression, settles every ${SETTLE_INTERVAL_MS}ms"
+echo
+echo "  Start earning in Claude Code (fast demo cadence — bills ~every 5s):"
+echo "    PP_ROTATION_MS=5000 PP_MIN_REPORT_GAP_MS=3000 PP_TICK_MS=2000 \\"
+echo "      node cli/bin/promptpay.mjs setup --server $URL"
+echo "  then open a new \`claude\` session and watch: node cli/bin/promptpay.mjs status"
 echo
 echo "Ctrl-C to stop the server + tunnel (the site will fall back to its placeholder)."
 wait $SERVER_PID
