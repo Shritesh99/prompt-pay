@@ -1,0 +1,155 @@
+// PromptPay earning daemon. Polls the ad-server, rotates the ad surfaces
+// (status line file + Claude Code spinnerVerbs), and reports impressions —
+// but ONLY while the statusline heartbeat proves an ad is actually on screen.
+import { readFileSync, writeFileSync } from "node:fs";
+import { keccak256, toHex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { PATHS, loadConfig } from "./config.mjs";
+import { updateSpinnerVerb } from "./settings.mjs";
+
+const TICK_MS = 5_000;
+const ROTATION_MS = 15_000; // hold each ad so billing is honest
+const HEARTBEAT_FRESH_MS = 12_000; // statusline rendered recently = visible
+const MIN_REPORT_GAP_MS = 5_000;
+const EARNINGS_POLL_MS = 15_000;
+
+const config = loadConfig();
+if (!config?.agentPrivateKey) {
+  console.error("no config — run `promptpay setup` first");
+  process.exit(1);
+}
+const account = privateKeyToAccount(config.agentPrivateKey);
+const serverBase = config.serverBase ?? "http://localhost:4021";
+console.log(`[daemon] agent ${account.address} → ${serverBase}`);
+
+let currentAd = null; // {adId, campaignId, adText, clickUrl, viewThresholdMs}
+let adShownAt = 0;
+let lastReportAt = 0;
+let lastEarningsAt = 0;
+let earnedUsd = null;
+let impressionReportedForRotation = false;
+
+function heartbeatFresh() {
+  try {
+    const t = Number(readFileSync(PATHS.heartbeat, "utf8"));
+    return Date.now() - t < HEARTBEAT_FRESH_MS;
+  } catch {
+    return false;
+  }
+}
+
+function writeAdFile() {
+  const payload = currentAd
+    ? { ...currentAd, fetchedAt: adShownAt, earnedUsd }
+    : { fetchedAt: 0 };
+  try {
+    writeFileSync(PATHS.currentAd, JSON.stringify(payload));
+  } catch {}
+}
+
+async function signedReport(type) {
+  const body = JSON.stringify({
+    campaignId: currentAd.campaignId,
+    type,
+    surface: "claude-cli-statusline",
+  });
+  const post = (headers) =>
+    fetch(`${serverBase}/report`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body,
+    });
+
+  const bare = await post({});
+  if (bare.status !== 402) return bare.json();
+  const { challenge } = await bare.json();
+
+  const message = [
+    "PromptPay Report v1",
+    `domain: ${challenge.domain}`,
+    `uri: ${challenge.uri}`,
+    `agent: ${account.address.toLowerCase()}`,
+    `nonce: ${challenge.nonce}`,
+    `issuedAt: ${challenge.issuedAt}`,
+    `body: ${keccak256(toHex(body))}`,
+  ].join("\n");
+  const signature = await account.signMessage({ message });
+
+  const signed = await post({
+    "x-pp-agent": account.address,
+    "x-pp-nonce": challenge.nonce,
+    "x-pp-issued-at": challenge.issuedAt,
+    "x-pp-signature": signature,
+  });
+  return signed.json();
+}
+
+async function tick() {
+  // killswitch: blank every surface
+  try {
+    const ks = await (await fetch(`${serverBase}/killswitch`)).json();
+    if (ks.killed) {
+      currentAd = null;
+      writeAdFile();
+      return;
+    }
+  } catch {
+    return; // server unreachable — keep last state, report nothing
+  }
+
+  // rotate the ad at most every ROTATION_MS
+  if (!currentAd || Date.now() - adShownAt >= ROTATION_MS) {
+    try {
+      const res = await (await fetch(`${serverBase}/ad`)).json();
+      if (res.ad) {
+        const changed = currentAd?.adId !== res.ad.adId;
+        if (changed || !currentAd) {
+          currentAd = { ...res.ad, viewThresholdMs: res.viewThresholdMs ?? 3000 };
+          adShownAt = Date.now();
+          impressionReportedForRotation = false;
+          updateSpinnerVerb(currentAd.adText);
+          writeAdFile();
+          console.log(`[daemon] ad: "${currentAd.adText}"`);
+        } else {
+          adShownAt = Date.now(); // same ad, new rotation window — bill again
+          impressionReportedForRotation = false;
+        }
+      } else {
+        currentAd = null;
+        writeAdFile();
+      }
+    } catch {}
+  }
+
+  // refresh earnings for the status line
+  if (Date.now() - lastEarningsAt > EARNINGS_POLL_MS) {
+    lastEarningsAt = Date.now();
+    try {
+      const e = await (await fetch(`${serverBase}/earnings/${account.address}`)).json();
+      earnedUsd = (Number(e.claimable) / 1e6).toFixed(4);
+      writeAdFile();
+    } catch {}
+  }
+
+  // impression gating: ad held past view threshold + statusline actually rendering
+  if (
+    currentAd &&
+    !impressionReportedForRotation &&
+    Date.now() - adShownAt >= (currentAd.viewThresholdMs ?? 3000) &&
+    Date.now() - lastReportAt >= MIN_REPORT_GAP_MS &&
+    heartbeatFresh()
+  ) {
+    impressionReportedForRotation = true;
+    lastReportAt = Date.now();
+    try {
+      const out = await signedReport("impression");
+      if (out.credited) console.log(`[daemon] impression credited (campaign ${currentAd.campaignId})`);
+      else console.log(`[daemon] impression not credited:`, JSON.stringify(out));
+    } catch (err) {
+      console.error(`[daemon] report failed:`, err.message);
+    }
+  }
+}
+
+setInterval(() => tick().catch(() => {}), TICK_MS);
+tick().catch(() => {});

@@ -8,6 +8,12 @@ importers:
 
   .: {}
 
+  cli:
+    dependencies:
+      viem:
+        specifier: ^2.21.55
+        version: 2.55.11(typescript@5.9.3)(zod@3.25.76)
+
   server:
     dependencies:
       '@hono/node-server':
