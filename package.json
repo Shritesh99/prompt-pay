@@ -1,0 +1,12 @@
+{
+  "name": "promptpay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PromptPay — get paid while Claude Code thinks. On-chain ad auction on Monad.",
+  "scripts": {
+    "dev": "./scripts/dev-stack.sh",
+    "e2e": "pnpm --filter @promptpay/server e2e",
+    "test:contracts": "forge test --root contracts",
+    "deploy:monad": "./scripts/deploy-monad.sh"
+  }
+}
