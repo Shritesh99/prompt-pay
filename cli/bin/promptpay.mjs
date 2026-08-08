@@ -64,6 +64,20 @@ function stopDaemon() {
   console.log(`daemon stopped (pid ${pid})`);
 }
 
+// Always start a fresh daemon (kill any existing one first) — setup rewrites
+// config, and re-running the installer should replace a stale daemon.
+function restartDaemon() {
+  const pid = daemonPid();
+  if (pid) {
+    try {
+      process.kill(pid);
+    } catch {}
+    rmSync(PATHS.pid, { force: true });
+    console.log(`stopped previous daemon (pid ${pid})`);
+  }
+  startDaemon();
+}
+
 switch (cmd) {
   case "setup": {
     ensureHome();
@@ -77,7 +91,7 @@ switch (cmd) {
     saveConfig({ agentPrivateKey: key, serverBase, payout });
     copyFileSync(path.join(here, "../src/statusline.mjs"), PATHS.statusline);
     installSettings("promptpay · waiting for ads");
-    startDaemon();
+    restartDaemon();
     const address = privateKeyToAccount(key).address;
     console.log(`\nagent (signing key): ${address}`);
     console.log(`payout: ${payout ?? address}${payout ? "" : "  (no --wallet given; earnings go to the signing key)"}`);
