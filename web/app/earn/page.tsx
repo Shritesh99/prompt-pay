@@ -48,12 +48,29 @@ export default function EarnPage() {
     setClaiming(true);
     setClaimMsg(null);
     try {
-      // top up gas for the agent wallet, then claim directly with the agent key
-      await fetch("/api/faucet", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ address: account.address, gasOnly: true }),
-      });
+      // The agent wallet needs native gas to sign claimAll(). Top it up, then
+      // WAIT until the balance actually lands before claiming — the faucet tx
+      // and the claim must not race (that caused "insufficient balance").
+      const MIN_GAS = 10n ** 16n; // 0.01 MON — plenty for a claim
+      let balance = await publicClient.getBalance({ address: account.address });
+      if (balance < MIN_GAS) {
+        setClaimMsg("Funding gas…");
+        const res = await fetch("/api/faucet", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ address: account.address, gasOnly: true }),
+        });
+        // poll for the gas to arrive (covers async faucet + rate-limit cases)
+        for (let i = 0; i < 15 && balance < MIN_GAS; i++) {
+          await new Promise((r) => setTimeout(r, 1000));
+          balance = await publicClient.getBalance({ address: account.address });
+        }
+        if (balance < MIN_GAS) {
+          const detail = res.ok ? "faucet sent but gas hasn't arrived yet" : `faucet ${res.status}`;
+          throw new Error(`no gas to claim (${detail}) — wait a moment and try again`);
+        }
+      }
+      setClaimMsg("Claiming…");
       const wallet = createWalletClient({ account, chain: activeChain, transport: http() });
       const hash = await wallet.writeContract({
         address: deployment.vault,
