@@ -9,8 +9,5 @@
     "test:contracts": "forge test --root contracts",
     "deploy:monad": "./scripts/deploy-monad.sh",
     "build:web": "pnpm --filter @promptpay/web build"
-  },
-  "dependencies": {
-    "@supabase/server": "^1.4.1"
   }
 }
