@@ -80,7 +80,25 @@ const SLIDES = [
     </div>
   </div>,
 
-  // 4 — Live + CTA
+  // 4 — Identity & Sybil resistance
+  <div key="identity" className="space-y-4">
+    <h2 className="text-center text-4xl font-bold">Identity &amp; Sybil resistance</h2>
+    <div className="mx-auto max-w-xl">
+      <Node>🔑 Signing key — generated on your device, never shown, disposable</Node>
+      <Arrow label="signs each impression (EIP-191) — proves the ad was shown, not who you are" />
+      <Node accent>👛 Payout wallet — your identity · the daily cap is per WALLET</Node>
+      <Arrow label="a wallet can only earn once it is enrolled" />
+      <Node>🛡 Enrollment — human check (Turnstile) + signature proving control</Node>
+      <Arrow label="hardened next by" />
+      <Node accent>🌍 World ID — bind a wallet to one verified human (one human, one earner)</Node>
+    </div>
+    <p className="mx-auto max-w-xl text-center text-xs text-zinc-500">
+      Spinning up more signing keys earns nothing: identity and the cap live on the wallet, and a
+      wallet must pass a human check to earn — so fake impressions don&apos;t pay.
+    </p>
+  </div>,
+
+  // 5 — Live + CTA
   <div key="live" className="space-y-8">
     <h2 className="text-center text-4xl font-bold">
       Live on <span className="text-violet-400">Monad testnet</span>
