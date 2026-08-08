@@ -115,9 +115,23 @@ assert.equal(claimable, expectedEarnerShare, `claimable ${claimable} != expected
 console.log(`on-chain claimable == exact 50% share (${claimable} base units) ✓`);
 
 // --- claim: fund gas, claimAll, assert USDC lands ---
+// The funder often shares an account with the server's settlement oracle, so a
+// same-nonce oracle tx can replace our transfer (viem's receipt wait follows
+// replacements silently). Verify arrival and retry until the gas lands.
 const funder = createWalletClient({ account: privateKeyToAccount(gasKey), chain, transport: http(rpcUrl) });
-const gasTx = await funder.sendTransaction({ to: earner.address, value: 10n ** 17n });
-await pub.waitForTransactionReceipt({ hash: gasTx });
+const GAS_DRIP = 5n * 10n ** 16n; // 0.05 native
+for (let i = 0; i < 6; i++) {
+  const bal = await pub.getBalance({ address: earner.address });
+  if (bal >= GAS_DRIP / 2n) break;
+  if (i === 5) throw new Error("could not fund earner gas after retries");
+  try {
+    const gasTx = await funder.sendTransaction({ to: earner.address, value: GAS_DRIP });
+    await pub.waitForTransactionReceipt({ hash: gasTx });
+  } catch (err) {
+    console.log(`  gas funding attempt ${i + 1} failed: ${err.shortMessage ?? err.message}`);
+  }
+  await new Promise((r) => setTimeout(r, 2000));
+}
 const earnerWallet = createWalletClient({ account: earner, chain, transport: http(rpcUrl) });
 const claimTx = await earnerWallet.writeContract({
   address: deployment.vault,

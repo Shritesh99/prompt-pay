@@ -1,0 +1,44 @@
+{
+  "name": "promptpay-vscode",
+  "displayName": "PromptPay — earn while Claude thinks",
+  "description": "Shows the winning PromptPay ad in Claude Code's thinking spinner and pays you USDC per impression on Monad.",
+  "version": "0.1.0",
+  "publisher": "promptpay",
+  "private": true,
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "promptpay.connect", "title": "PromptPay: Connect agent" },
+      { "command": "promptpay.enable", "title": "PromptPay: Enable ads in spinner" },
+      { "command": "promptpay.restore", "title": "PromptPay: Restore Claude Code" },
+      { "command": "promptpay.status", "title": "PromptPay: Show earnings" }
+    ],
+    "configuration": {
+      "title": "PromptPay",
+      "properties": {
+        "promptpay.serverBase": {
+          "type": "string",
+          "default": "http://localhost:4021",
+          "description": "PromptPay ad-server base URL."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "test": "node test/patch.test.mjs",
+    "package": "vsce package --no-dependencies -o promptpay.vsix"
+  },
+  "dependencies": {
+    "viem": "2.21.55"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2"
+  }
+}

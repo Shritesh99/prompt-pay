@@ -9,7 +9,7 @@ earn **50% of the revenue in USDC** per signed impression — claimable any time
 
 ## How it works
 
-```
+```text
 Claude Code                     PromptPay CLI daemon             Ad-server (Hono :4021)
  status line + thinking verb ──── heartbeat-gated, ──────────────▶ 402 challenge → EIP-191
  show the winning ad              signed impressions               verify · nonce replay guard
@@ -57,14 +57,23 @@ Prove the whole money loop headlessly (report → settle → claim, exact split 
 pnpm e2e
 ```
 
-## Monad testnet
+## Monad testnet — deployed & proven
 
-```bash
-PRIVATE_KEY=0x… ./scripts/deploy-monad.sh    # fund the key at https://faucet.monad.xyz
-```
+The suite is **live on Monad testnet (chain 10143)** and the full money loop
+(signed impressions → oracle settlement → exact 50/50 split → claim) passes end-to-end
+against it — e.g. settlement tx
+[`0x0653cda7…44da`](https://testnet.monadscan.com/tx/0x0653cda768826f17e4cf74ebe5f7ffe7d933937956836354990c99088ad544da).
 
-Same stack, real chain: run the server with `PROMPTPAY_NETWORK=monad` and the web with
-`NEXT_PUBLIC_PP_NETWORK=monad`. Chain 10143 · RPC `https://testnet-rpc.monad.xyz` ·
+| Contract | Address |
+| --- | --- |
+| MockUSDC | [`0xE78E87D994358D17aaf4653d8398f22C93fb758A`](https://testnet.monadscan.com/address/0xE78E87D994358D17aaf4653d8398f22C93fb758A) |
+| CampaignVault | [`0x5456E52531085291a35CF0d902aE72D6616b665D`](https://testnet.monadscan.com/address/0x5456E52531085291a35CF0d902aE72D6616b665D) |
+| AdAuction | [`0xFbca2B3334138C109D51f5101343DE0A35a0eDD9`](https://testnet.monadscan.com/address/0xFbca2B3334138C109D51f5101343DE0A35a0eDD9) |
+| PayoutSettlement | [`0xeD635654eF93E6a0A1D1b4402b9d77D8841C6868`](https://testnet.monadscan.com/address/0xeD635654eF93E6a0A1D1b4402b9d77D8841C6868) |
+
+Redeploy any time: put `MONAD_MNEMONIC` in `.env` (see `.env.example`) and run
+`./scripts/deploy-monad.sh`. Same stack, real chain: server with `PROMPTPAY_NETWORK=monad`,
+web with `NEXT_PUBLIC_PP_NETWORK=monad`. RPC `https://testnet-rpc.monad.xyz` ·
 explorer [testnet.monadscan.com](https://testnet.monadscan.com). Monad's ~400ms blocks make
 oracle settlement and claims feel instant — micropayments per impression only work when
 settlement costs less than the impression.

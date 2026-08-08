@@ -1,0 +1,8 @@
+src/**
+test/**
+tsconfig.json
+esbuild.mjs
+**/*.map
+.gitignore
+node_modules/**
+!node_modules/viem/**
