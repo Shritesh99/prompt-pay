@@ -97,6 +97,12 @@ async function tick() {
     } catch {}
   }
 
+  // Keep the thinking-verb ad in sync every tick (no-op if unchanged). This
+  // restores it if `setup` reset the placeholder, so a new Claude session shows
+  // the real ad rather than "waiting for ads". Claude reads spinnerVerbs at
+  // session start, so an already-open session needs a restart to pick it up.
+  if (currentAd) updateSpinnerVerb(withHost(currentAd.adText, currentAd.clickUrl));
+
   // refresh earnings for the status line
   if (Date.now() - lastEarningsAt > EARNINGS_POLL_MS) {
     lastEarningsAt = Date.now();
