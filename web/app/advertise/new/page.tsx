@@ -4,6 +4,7 @@ import { keccak256, parseEventLogs, toHex } from "viem";
 import { usdcAbi, vaultAbi, auctionAbi } from "../../../lib/abis";
 import { activeChain } from "../../../lib/chains";
 import { fmtUsdc, publicClient, useDeployment, useServerBase, useSigner } from "../../../lib/hooks";
+import { AddTokenButton } from "../../../components/AddTokenButton";
 
 type StepState = "idle" | "running" | "done" | "error";
 const STEPS = [
@@ -154,7 +155,10 @@ export default function NewCampaign() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Launch a campaign</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Launch a campaign</h1>
+        <AddTokenButton />
+      </div>
 
       <div className="space-y-4 rounded-xl border border-zinc-800 p-6">
         <label className="block">

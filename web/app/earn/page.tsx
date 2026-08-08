@@ -4,6 +4,7 @@ import { vaultAbi } from "../../lib/abis";
 import { explorerTx } from "../../lib/chains";
 import { fmtUsdc, publicClient, useDeployment, usePoll, useServerBase, useSigner } from "../../lib/hooks";
 import { Turnstile } from "../../components/Turnstile";
+import { AddTokenButton } from "../../components/AddTokenButton";
 
 const STORAGE_KEY = "promptpay.wallet";
 const isAddress = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s);
@@ -272,13 +273,16 @@ export default function EarnPage() {
           <p className="text-xs uppercase tracking-wide text-zinc-500">Wallet</p>
           <p className="break-all font-mono text-xs text-zinc-400">{wallet}</p>
           {connectedMatches ? (
-            <button
-              onClick={claim}
-              disabled={claiming || !earnings || earnings.claimable === "0"}
-              className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {claiming ? "Claiming…" : "Claim USDC"}
-            </button>
+            <div className="mt-3 space-y-2">
+              <button
+                onClick={claim}
+                disabled={claiming || !earnings || earnings.claimable === "0"}
+                className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {claiming ? "Claiming…" : "Claim USDC"}
+              </button>
+              <AddTokenButton />
+            </div>
           ) : (
             <p className="mt-3 text-xs text-zinc-500">
               Connect this wallet (top right){signer ? "" : " or use a dev wallet"} to claim.
