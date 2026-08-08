@@ -25,6 +25,15 @@ const account = privateKeyToAccount(config.agentPrivateKey);
 const serverBase = config.serverBase ?? "http://localhost:4021";
 console.log(`[daemon] agent ${account.address} → ${serverBase}`);
 
+// "<adText> → <host>" so the destination shows in the thinking verb too
+function withHost(adText, clickUrl) {
+  try {
+    return `${adText} → ${new URL(clickUrl).host.replace(/^www\./, "")}`;
+  } catch {
+    return adText;
+  }
+}
+
 let currentAd = null; // {adId, campaignId, adText, clickUrl, viewThresholdMs}
 let adShownAt = 0;
 let lastReportAt = 0;
@@ -110,7 +119,8 @@ async function tick() {
           currentAd = { ...res.ad, viewThresholdMs: res.viewThresholdMs ?? 3000 };
           adShownAt = Date.now();
           impressionReportedForRotation = false;
-          updateSpinnerVerb(currentAd.adText);
+          // include the destination host in the thinking-verb ad too
+          updateSpinnerVerb(withHost(currentAd.adText, currentAd.clickUrl));
           writeAdFile();
           console.log(`[daemon] ad: "${currentAd.adText}"`);
         } else {

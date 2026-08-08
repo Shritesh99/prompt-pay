@@ -21,9 +21,13 @@ SERVER_PORT="${PORT:-4021}"
 # budget = ~5000 impressions of runway.
 DEMO_PRICE_PER_SLOT="${PRICE_PER_SLOT:-1000000000}"   # 1000 pUSDC per 1000 impressions
 DEMO_BUDGET="${BUDGET:-5000000000}"                   # 5000 pUSDC
-# server-side: short dwell + fast settlement so earnings appear in seconds
-export VIEW_THRESHOLD_MS="${VIEW_THRESHOLD_MS:-1000}"
-export SETTLE_INTERVAL_MS="${SETTLE_INTERVAL_MS:-5000}"
+# server-side: short dwell + fast settlement so earnings appear in ~3s
+export VIEW_THRESHOLD_MS="${VIEW_THRESHOLD_MS:-800}"
+export SETTLE_INTERVAL_MS="${SETTLE_INTERVAL_MS:-3000}"
+# daemon cadence handed to `promptpay setup` (bills ~every 3s)
+DEMO_PP_ROTATION_MS="${PP_ROTATION_MS:-3000}"
+DEMO_PP_MIN_REPORT_GAP_MS="${PP_MIN_REPORT_GAP_MS:-2500}"
+DEMO_PP_TICK_MS="${PP_TICK_MS:-1000}"
 
 cleanup() {
   echo; echo "[tunnel] stopping…"
@@ -70,8 +74,8 @@ echo "  Live site:  https://promptpay-monad-blitz.netlify.app"
 echo "  Ad-server:  $URL  (via this laptop)"
 echo "  Economics:  \$0.50 earned per impression, settles every ${SETTLE_INTERVAL_MS}ms"
 echo
-echo "  Start earning in Claude Code (fast demo cadence — bills ~every 5s):"
-echo "    PP_ROTATION_MS=5000 PP_MIN_REPORT_GAP_MS=3000 PP_TICK_MS=2000 \\"
+echo "  Start earning in Claude Code (fast demo cadence — bills ~every 3s):"
+echo "    PP_ROTATION_MS=$DEMO_PP_ROTATION_MS PP_MIN_REPORT_GAP_MS=$DEMO_PP_MIN_REPORT_GAP_MS PP_TICK_MS=$DEMO_PP_TICK_MS \\"
 echo "      node cli/bin/promptpay.mjs setup --server $URL"
 echo "  then open a new \`claude\` session and watch: node cli/bin/promptpay.mjs status"
 echo

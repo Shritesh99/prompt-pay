@@ -19,10 +19,21 @@ try {
 
 const clean = (s) => [...String(s)].map((ch) => (ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127 ? " " : ch)).join("").slice(0, 90);
 
+// Show the destination as visible text (e.g. "monad.xyz") alongside the ad, and
+// still make the whole line an OSC-8 hyperlink to the full URL.
+const hostOf = (u) => {
+  try {
+    return new URL(u).host.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+};
+
 let line = "✦ promptpay · waiting for ads";
 if (ad && ad.adText && Date.now() - (ad.fetchedAt ?? 0) < 90_000) {
-  const label = `✦ ${clean(ad.adText)} · sponsored`;
   const url = /^https?:\/\//.test(ad.clickUrl ?? "") ? ad.clickUrl : null;
+  const host = url ? hostOf(url) : null;
+  const label = `✦ ${clean(ad.adText)}${host ? ` → ${host}` : ""} · sponsored`;
   // OSC 8 hyperlink — clickable in most modern terminals
   line = url ? `${ESC}]8;;${url}${ESC}\\${label}${ESC}]8;;${ESC}\\` : label;
   if (ad.earnedUsd) line += ` · earned $${ad.earnedUsd}`;
