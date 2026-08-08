@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
-import { keccak256, toHex, type Address } from "viem";
+import { keccak256, toHex, verifyMessage, type Address } from "viem";
 import { z } from "zod";
 import { config } from "./config.js";
 import { store } from "./db.js";
@@ -138,18 +138,23 @@ app.post("/report", async (c) => {
 
   const verdict = await verifyReport({ agent, nonce, issuedAt, signature, rawBody });
   if (!verdict.ok) return c.json({ error: verdict.error }, 401);
-  const { agent: signer, humanId } = verdict.verified;
+  const { agent: signer } = verdict.verified;
 
   const { campaignId, type, surface, payout } = parsed.data;
   if (!store.getCreative(campaignId)) return c.json({ error: "unknown_campaign" }, 404);
 
-  // The signer proves the impression; the payout wallet (if given) is who gets
-  // paid. The daily cap stays keyed on humanId (the signing key), so declaring
-  // a payout can't be used to exceed a cap.
-  const earner = payout ?? signer;
+  // Earning identity = the payout wallet (the signer just proves the impression).
+  // Cap is keyed on the wallet, so extra signing keys give no benefit.
+  const earner = (payout ?? signer).toLowerCase() as Address;
+  const humanId = keccak256(toHex(earner));
+
+  // A wallet must enroll (human check + signature) before it can earn.
+  if (!store.isEnrolled(earner)) {
+    return c.json({ ok: true, credited: false, reason: "not_enrolled" });
+  }
 
   const units = type === "click" ? 50 : 1;
-  const accepted = store.acceptUnits(humanId, units, config.perKeyDailyCap);
+  const accepted = store.acceptUnits(earner, units, config.perKeyDailyCap);
   if (accepted === 0) {
     return c.json({ ok: true, credited: false, capped: true });
   }
@@ -196,6 +201,58 @@ app.get("/auction", async (c) => {
 app.get("/activity", (c) =>
   c.json({ events: store.recentEvents(), receipts: store.recentReceipts() })
 );
+
+const enrollMessage = (wallet: string, issuedAt: string) =>
+  ["PromptPay Enroll v1", `wallet: ${wallet.toLowerCase()}`, `issuedAt: ${issuedAt}`].join("\n");
+
+async function verifyTurnstile(token: string | undefined): Promise<boolean> {
+  const secret = process.env.TURNSTILE_SECRET;
+  if (!secret) return true; // not configured (local dev) → skip the human check
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ secret, response: token ?? "" }),
+    });
+    return !!((await res.json()) as { success: boolean }).success;
+  } catch {
+    return false;
+  }
+}
+
+const enrollBody = z.object({
+  wallet: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+  issuedAt: z.string(),
+  signature: z.string(),
+  turnstileToken: z.string().optional(),
+});
+
+app.post("/enroll", async (c) => {
+  const parsed = enrollBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "bad_body", detail: parsed.error.flatten() }, 400);
+  const { wallet, issuedAt, signature, turnstileToken } = parsed.data;
+
+  const t = Date.parse(issuedAt);
+  if (!t || Math.abs(Date.now() - t) > 10 * 60 * 1000) return c.json({ error: "stale_issuedAt" }, 400);
+  if (!(await verifyTurnstile(turnstileToken))) return c.json({ error: "human_check_failed" }, 403);
+
+  let ok = false;
+  try {
+    ok = await verifyMessage({ address: wallet as Address, message: enrollMessage(wallet, issuedAt), signature: signature as `0x${string}` });
+  } catch {
+    ok = false;
+  }
+  if (!ok) return c.json({ error: "bad_signature" }, 401);
+
+  store.enroll(wallet);
+  return c.json({ ok: true, enrolled: true });
+});
+
+app.get("/enrolled/:wallet", (c) => {
+  const wallet = c.req.param("wallet");
+  if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) return c.json({ error: "bad_address" }, 400);
+  return c.json({ wallet: wallet.toLowerCase(), enrolled: store.isEnrolled(wallet) });
+});
 
 app.post("/settle/flush", async (c) => c.json(await flushSettlements()));
 

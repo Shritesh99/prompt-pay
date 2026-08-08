@@ -62,6 +62,29 @@ const now = () => Date.now();
 const creativeHashOf = (text: string, clickUrl: string) => keccak256(toHex(`${text}\n${clickUrl}`));
 const domain = new URL(PUBLIC_URL).host;
 const reportUri = `${PUBLIC_URL}/report`;
+const TURNSTILE_SECRET = env("TURNSTILE_SECRET");
+
+const enrollMessage = (wallet: string, issuedAt: string) =>
+  ["PromptPay Enroll v1", `wallet: ${wallet.toLowerCase()}`, `issuedAt: ${issuedAt}`].join("\n");
+
+async function verifyTurnstile(token: string | undefined): Promise<boolean> {
+  if (!TURNSTILE_SECRET) return true; // not configured (dev) → skip the human check
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ secret: TURNSTILE_SECRET, response: token ?? "" }),
+    });
+    return !!(await res.json()).success;
+  } catch {
+    return false;
+  }
+}
+
+async function isEnrolled(wallet: string): Promise<boolean> {
+  const [r] = await sql`select 1 from enrollments where wallet = ${wallet.toLowerCase()}`;
+  return !!r;
+}
 const randomHex = (bytes: number) => {
   const a = new Uint8Array(bytes);
   crypto.getRandomValues(a);
@@ -251,15 +274,22 @@ app.post("/report", async (c) => {
   } catch { valid = false; }
   if (!valid) return c.json({ error: "bad_signature" }, 401);
 
-  const humanId = keccak256(toHex(agent.toLowerCase()));
   const { campaignId, type, surface, payout } = parsed.data;
+  // Earning identity = the payout wallet (the signer just proves the impression).
+  // The cap is keyed on the wallet, so extra signing keys give no benefit.
   const earner = (payout ?? agent).toLowerCase();
+  const humanId = keccak256(toHex(earner));
 
   const [cr] = await sql`select 1 from creatives where campaign_id = ${campaignId}`;
   if (!cr) return c.json({ error: "unknown_campaign" }, 404);
 
+  // A wallet must enroll (human check + signature) before it can earn.
+  if (!(await isEnrolled(earner))) {
+    return c.json({ ok: true, credited: false, reason: "not_enrolled" });
+  }
+
   const units = type === "click" ? 50 : 1;
-  const [{ accepted }] = await sql`select accept_units(${humanId}, ${units}, ${PER_KEY_DAILY_CAP}, ${now()}) as accepted`;
+  const [{ accepted }] = await sql`select accept_units(${earner}, ${units}, ${PER_KEY_DAILY_CAP}, ${now()}) as accepted`;
   if (accepted === 0) return c.json({ ok: true, credited: false, capped: true });
   const impressions = type === "impression" ? 1 : 0;
   const clicks = type === "click" && accepted === 50 ? 1 : 0;
@@ -311,6 +341,39 @@ app.get("/activity", async (c) => {
   const events = await sql`select * from events_log order by id desc limit 50`;
   const receipts = await sql`select * from receipts order by settled_at desc limit 100`;
   return c.json({ events, receipts });
+});
+
+const enrollBody = z.object({
+  wallet: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+  issuedAt: z.string(),
+  signature: z.string(),
+  turnstileToken: z.string().optional(),
+});
+
+app.post("/enroll", async (c) => {
+  const parsed = enrollBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "bad_body", detail: parsed.error.flatten() }, 400);
+  const { wallet, issuedAt, signature, turnstileToken } = parsed.data;
+
+  const t = Date.parse(issuedAt);
+  if (!t || Math.abs(now() - t) > 10 * 60 * 1000) return c.json({ error: "stale_issuedAt" }, 400);
+  if (!(await verifyTurnstile(turnstileToken))) return c.json({ error: "human_check_failed" }, 403);
+
+  let ok = false;
+  try {
+    ok = await verifyMessage({ address: wallet as Address, message: enrollMessage(wallet, issuedAt), signature: signature as Hex });
+  } catch { ok = false; }
+  if (!ok) return c.json({ error: "bad_signature" }, 401);
+
+  await sql`insert into enrollments (wallet, enrolled_at) values (${wallet.toLowerCase()}, ${now()})
+            on conflict (wallet) do update set enrolled_at = excluded.enrolled_at`;
+  return c.json({ ok: true, enrolled: true });
+});
+
+app.get("/enrolled/:wallet", async (c) => {
+  const wallet = c.req.param("wallet");
+  if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) return c.json({ error: "bad_address" }, 400);
+  return c.json({ wallet: wallet.toLowerCase(), enrolled: await isEnrolled(wallet) });
 });
 
 app.post("/settle/flush", async (c) => c.json(await settlePending()));

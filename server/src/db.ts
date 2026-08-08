@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS receipts (
   tx_hash TEXT NOT NULL,
   settled_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS enrollments (
+  wallet TEXT PRIMARY KEY,
+  enrolled_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS events_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   campaign_id TEXT NOT NULL,
@@ -110,6 +114,19 @@ export const store = {
       .prepare(`UPDATE challenges SET used = 1 WHERE nonce = ? AND used = 0 AND expires_at > ?`)
       .run(nonce, Date.now());
     return res.changes === 1;
+  },
+
+  // ---- enrollment (a wallet must enroll before it can earn) ----
+
+  enroll(wallet: string) {
+    db.prepare(
+      `INSERT INTO enrollments (wallet, enrolled_at) VALUES (?, ?)
+       ON CONFLICT(wallet) DO UPDATE SET enrolled_at = excluded.enrolled_at`
+    ).run(wallet.toLowerCase(), Date.now());
+  },
+
+  isEnrolled(wallet: string): boolean {
+    return !!db.prepare(`SELECT 1 FROM enrollments WHERE wallet = ?`).get(wallet.toLowerCase());
   },
 
   // ---- caps ----

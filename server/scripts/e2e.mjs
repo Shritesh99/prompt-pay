@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createPublicClient, createWalletClient, defineChain, http, keccak256, toHex } from "viem";
+import { createPublicClient, createWalletClient, defineChain, fallback, http, keccak256, toHex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -26,13 +26,20 @@ const gasKey =
 const IMPRESSIONS = Number(process.env.E2E_IMPRESSIONS ?? 5);
 const CLICKS = 1;
 
+const rpcUrls = [
+  rpcUrl,
+  ...(network === "monad" ? ["https://rpc.ankr.com/monad_testnet", "https://rpc-testnet.monadinfra.com"] : []),
+].filter((u, i, a) => u && a.indexOf(u) === i);
 const chain = defineChain({
   id: deployment.chainId,
   name: network,
   nativeCurrency: { name: "n", symbol: "n", decimals: 18 },
-  rpcUrls: { default: { http: [rpcUrl] } },
+  rpcUrls: { default: { http: rpcUrls } },
 });
-const pub = createPublicClient({ chain, transport: http(rpcUrl) });
+const pub = createPublicClient({
+  chain,
+  transport: fallback(rpcUrls.map((u) => http(u, { retryCount: 3, retryDelay: 300 }))),
+});
 const abi = (name, file) =>
   JSON.parse(readFileSync(path.join(root, "contracts/out", file, `${name}.json`), "utf8")).abi;
 const vaultAbi = abi("CampaignVault", "CampaignVault.sol");
@@ -47,6 +54,21 @@ const adRes = await (await fetch(`${serverBase}/ad`)).json();
 assert.ok(adRes.ad, "no ad being served — seed a campaign first");
 const { campaignId, pricePerSlot } = adRes.ad;
 console.log(`ad: campaign ${campaignId} @ ${pricePerSlot}/slot`);
+
+// --- enroll the earner wallet (required before it can earn) ---
+{
+  const issuedAt = new Date().toISOString();
+  const message = ["PromptPay Enroll v1", `wallet: ${earner.address.toLowerCase()}`, `issuedAt: ${issuedAt}`].join("\n");
+  const signature = await earner.signMessage({ message });
+  const res = await fetch(`${serverBase}/enroll`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ wallet: earner.address, issuedAt, signature, turnstileToken: "test" }),
+  });
+  const out = await res.json();
+  assert.ok(res.ok && out.enrolled, `enroll failed: ${JSON.stringify(out)}`);
+  console.log("enrolled earner wallet ✓");
+}
 
 // --- signed reporting (402 challenge -> EIP-191 -> retry) ---
 async function report(type) {

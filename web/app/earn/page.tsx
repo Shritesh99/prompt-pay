@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { vaultAbi } from "../../lib/abis";
 import { explorerTx } from "../../lib/chains";
 import { fmtUsdc, publicClient, useDeployment, usePoll, useServerBase, useSigner } from "../../lib/hooks";
+import { Turnstile } from "../../components/Turnstile";
 
 const STORAGE_KEY = "promptpay.wallet";
 const isAddress = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s);
@@ -18,6 +19,10 @@ export default function EarnPage() {
   const [claiming, setClaiming] = useState(false);
   const [claimMsg, setClaimMsg] = useState<string | null>(null);
   const [claimTx, setClaimTx] = useState<string | null>(null);
+  const [enrolled, setEnrolled] = useState<boolean | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollMsg, setEnrollMsg] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
@@ -46,6 +51,47 @@ export default function EarnPage() {
 
   const curlCmd = `curl -fsSL ${origin}/install.sh | sh -s -- --wallet ${wallet ?? "0xYourWallet"}`;
   const connectedMatches = signer && wallet && signer.address.toLowerCase() === wallet;
+
+  // enrollment status for the current wallet
+  useEffect(() => {
+    if (!wallet) return;
+    let alive = true;
+    const check = () =>
+      fetch(`${serverBase}/enrolled/${wallet}`)
+        .then((r) => r.json())
+        .then((j) => alive && setEnrolled(!!j.enrolled))
+        .catch(() => {});
+    check();
+    const t = setInterval(check, 5000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [serverBase, wallet]);
+
+  async function enroll() {
+    if (!signer || !connectedMatches || !wallet) return;
+    setEnrolling(true);
+    setEnrollMsg(null);
+    try {
+      const issuedAt = new Date().toISOString();
+      const message = ["PromptPay Enroll v1", `wallet: ${wallet}`, `issuedAt: ${issuedAt}`].join("\n");
+      const signature = await signer.walletClient.signMessage({ account: signer.address, message });
+      const res = await fetch(`${serverBase}/enroll`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ wallet, issuedAt, signature, turnstileToken }),
+      });
+      const out = await res.json();
+      if (!res.ok || !out.enrolled) throw new Error(out.error ?? "enroll failed");
+      setEnrolled(true);
+      setEnrollMsg("Enrolled — this wallet can now earn.");
+    } catch (err) {
+      setEnrollMsg(`Enroll failed: ${(err as Error).message}`);
+    } finally {
+      setEnrolling(false);
+    }
+  }
 
   async function claim() {
     if (!deployment || !signer || !connectedMatches) return;
@@ -153,8 +199,49 @@ export default function EarnPage() {
         </button>
       </div>
 
+      <div className={`rounded-xl border p-6 ${enrolled ? "border-emerald-800/60 bg-emerald-950/20" : "border-amber-800/60 bg-amber-950/20"}`}>
+        <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-zinc-300">
+          Enroll to earn {enrolled === true && <span className="text-emerald-400">· ✓ enrolled</span>}
+        </h2>
+        {enrolled ? (
+          <p className="text-xs text-zinc-400">
+            This wallet is enrolled — impressions from your agent settle here. The daily cap is per
+            wallet, so extra signing keys don&apos;t earn more.
+          </p>
+        ) : (
+          <>
+            <p className="mb-2 text-xs text-zinc-400">
+              A wallet must enroll before it can earn: pass a human check and sign to prove you
+              control it. This is what stops free key/wallet spam from farming impressions.
+            </p>
+            {connectedMatches ? (
+              <>
+                <Turnstile onToken={setTurnstileToken} />
+                <button
+                  onClick={enroll}
+                  disabled={enrolling || !turnstileToken}
+                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {enrolling ? "Enrolling…" : "Enroll this wallet"}
+                </button>
+              </>
+            ) : (
+              <p className="text-xs text-zinc-500">
+                Connect this wallet (top right){signer ? "" : " or use a dev wallet"} to enroll.
+                {!signer && (
+                  <button onClick={useDevWallet} className="ml-1 underline hover:text-zinc-300">
+                    dev wallet
+                  </button>
+                )}
+              </p>
+            )}
+          </>
+        )}
+        {enrollMsg && <p className="mt-2 text-xs text-zinc-300">{enrollMsg}</p>}
+      </div>
+
       <div className="rounded-xl border border-violet-800/60 bg-violet-950/20 p-6">
-        <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-violet-300">Step 2 of 2 · Install &amp; earn</h2>
+        <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-violet-300">Install &amp; earn</h2>
         <p className="mb-3 text-xs text-zinc-400">
           Run this on your machine. A signing key is generated locally and never leaves your device; earnings
           settle to <span className="font-mono text-zinc-200">{wallet.slice(0, 6)}…{wallet.slice(-4)}</span>. Add{" "}
