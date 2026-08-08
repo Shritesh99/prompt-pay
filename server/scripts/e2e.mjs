@@ -98,19 +98,25 @@ assert.equal(replay.status, 401, "nonce replay should be rejected");
 console.log("nonce replay rejected ✓");
 
 // --- settle ---
-const flush = await (await fetch(`${serverBase}/settle/flush`, { method: "POST" })).json();
-assert.ok(flush.settled >= 1, `expected a settled batch, got ${JSON.stringify(flush)}`);
-
-// --- assert exact on-chain 50% split ---
+// Two settlement models: the Node server batches on /settle/flush; the Supabase
+// edge function settles on report. Trigger a flush (harmless either way) and
+// then poll on-chain claimable until it reaches the expected split.
 const units = BigInt(IMPRESSIONS) + BigInt(CLICKS) * 50n;
 const cost = (units * BigInt(pricePerSlot)) / 1000n;
 const expectedEarnerShare = (cost * 5000n) / 10000n;
-const claimable = await pub.readContract({
-  address: deployment.vault,
-  abi: vaultAbi,
-  functionName: "claimable",
-  args: [earner.address],
-});
+
+let claimable = 0n;
+for (let i = 0; i < 15; i++) {
+  await fetch(`${serverBase}/settle/flush`, { method: "POST" }).catch(() => {});
+  claimable = await pub.readContract({
+    address: deployment.vault,
+    abi: vaultAbi,
+    functionName: "claimable",
+    args: [earner.address],
+  });
+  if (claimable >= expectedEarnerShare) break;
+  await new Promise((r) => setTimeout(r, 2000));
+}
 assert.equal(claimable, expectedEarnerShare, `claimable ${claimable} != expected ${expectedEarnerShare}`);
 console.log(`on-chain claimable == exact 50% share (${claimable} base units) ✓`);
 

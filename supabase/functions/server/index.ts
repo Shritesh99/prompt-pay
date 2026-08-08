@@ -272,8 +272,12 @@ app.post("/report", async (c) => {
                   clicks = pending.clicks + excluded.clicks, updated_at = excluded.updated_at`;
   await sql`insert into events_log (campaign_id, surface, type, earner, created_at) values (${campaignId}, ${surface ?? null}, ${type}, ${earner}, ${now()})`;
 
-  // settle on report (serialized by advisory lock)
-  settlePending().catch((e) => console.error("settle error:", (e as Error).message));
+  // settle on report (serialized by advisory lock). Prefer waitUntil so the
+  // background settlement can't be torn down when the response returns.
+  const settleP = settlePending().catch((e) => console.error("settle error:", (e as Error).message));
+  const er = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (er?.waitUntil) er.waitUntil(settleP);
+  else await settleP;
   return c.json({ ok: true, credited: true, capped: accepted < units, earner, campaignId });
 });
 
