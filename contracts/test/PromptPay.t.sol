@@ -112,7 +112,7 @@ contract PromptPayTest is Test {
         assertEq(vault.claimable(earner), 0);
     }
 
-    function test_claim_revertsOverAccruedOrZero() public {
+    function test_claim_revertsOverClaimableOrZero() public {
         vm.startPrank(earner);
         vm.expectRevert(CampaignVault.NothingToClaim.selector);
         vault.claim(1);

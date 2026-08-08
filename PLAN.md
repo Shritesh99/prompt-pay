@@ -1,11 +1,14 @@
-# PromptPay — Accrue-style ad marketplace on Monad
+# PromptPay — an on-chain ad marketplace for AI wait time, on Monad
 
 ## Context
 
-The user studied the ETHGlobal showcase project **Accrue** (https://ethglobal.com/showcase/accrue-racfy — Hedera track winner, ETHGlobal NY 2026 finalist): advertisers escrow USDC and bid in an on-chain English auction to show sponsored messages during Claude Code "thinking" time; developers earn 50% of ad revenue per verified impression/click. The user wants to build the **same concept from scratch** as **PromptPay** in the empty directory `/Users/rxshri99/Projects/hackathons/promptpay`, targeting **Monad testnet** instead of Hedera.
+Every developer stares at an AI "thinking" spinner dozens of times a day — dead time that no one
+monetizes. **PromptPay** turns it into a two-sided on-chain marketplace: advertisers escrow USDC
+and bid in an on-chain English auction to sponsor Claude Code's thinking spinner; developers who
+show the winning ad earn 50% of the revenue per verified impression/click, claimable any time.
+Built for **Monad Blitz London** on **Monad testnet**, in `/Users/rxshri99/Projects/hackathons/promptpay`.
 
 Confirmed decisions:
-- **Reference only**: Accrue has no LICENSE (all rights reserved) — a research clone lives at `/tmp/accrue-research` for architectural reference; **no code may be copied**. All PromptPay code is original.
 - **Chain**: Monad testnet — chain ID `10143`, RPC `https://testnet-rpc.monad.xyz` (alt `https://rpc.ankr.com/monad_testnet`, ws `wss://testnet-rpc.monad.xyz`), native token MON (18dp), faucet `https://faucet.monad.xyz`, explorers `https://testnet.monadscan.com` / `https://testnet.monadvision.com`. Fully EVM-compatible; Foundry/wagmi/viem work unmodified. ~400ms blocks. Local dev on anvil first.
 - **Sybil resistance deferred**: no World ID in MVP, but design the seams (humanId passthrough, per-key caps) so an AgentRegistry + World ID slots in later with zero money-contract changes.
 - **Both earner surfaces**: CLI/statusline first (officially supported Claude Code settings — reliable hero demo), VS Code extension (webview bundle patching) as a stretch phase.
@@ -40,7 +43,7 @@ promptpay/
 
 ## Contracts (original designs)
 
-Economic model (same as Accrue's): pricing unit = USDC base units (6dp) per **slot** = 1000 impressions; click = 50 impression-units; 50/50 earner/treasury split.
+Economic model: pricing unit = USDC base units (6dp) per **slot** = 1000 impressions; click = 50 impression-units; 50/50 earner/treasury split.
 
 - **`lib/AdMath.sol`** — pure: `IMPRESSIONS_PER_SLOT=1000`, `CLICK_UNITS=50`, `EARNER_BPS=5000`; `costOf(impr, clicks, pricePerSlot) = (impr + clicks*50) * pricePerSlot / 1000`; `splitOf(amount)` → 50% earner, remainder treasury (no dust).
 - **`CampaignVault.sol`** — the only token custodian. `Campaign{advertiser, balance, pricePerSlot, creativeHash, active}`; advertiser: `createCampaign(creativeHash)`, `fund`, `withdraw`, `deactivate`; operator-only (auction + settlement): `setPrice`, `deduct`, `credit`; earner: `claim(amount)`/`claimAll()` against `claimable[address]`. OZ Ownable + ReentrancyGuard + SafeERC20, custom errors, full event set.
@@ -54,7 +57,7 @@ Economic model (same as Accrue's): pricing unit = USDC base units (6dp) per **sl
 
 - **Config**: loads `contracts/deployments/${PROMPTPAY_NETWORK||anvil}.json`; env: `RPC_URL`, `ORACLE_PRIVATE_KEY`, `VIEW_THRESHOLD_MS=3000`, `SETTLE_INTERVAL_MS=15000`, `PER_KEY_DAILY_CAP=2000`, `KILLSWITCH`.
 - **SQLite** (better-sqlite3, WAL): `creatives`, `challenges` (nonce replay), `usage` (rolling-24h caps, atomic partial acceptance), `pending` (keyed campaign+earner+humanId), `receipts`, `events_log`.
-- **Auth — original EIP-191 challenge–response** (replaces Accrue's x402/AgentKit): `POST /report` without headers → HTTP 402 + `{nonce, issuedAt, expiresAt, domain, uri}`. Client signs a canonical message (`PromptPay Report v1` + domain/uri/agent/nonce/issuedAt + **`keccak256(rawBody)`** so the signature covers the payload) with its agent key; sends `x-pp-agent/nonce/issued-at/signature` headers. Server verifies via viem `verifyMessage`, single-use nonce. `resolveHumanId(agent)` = `keccak256(agent)` for now, with a marked seam for the AgentRegistry lookup.
+- **Auth — EIP-191 challenge–response**: `POST /report` without headers → HTTP 402 + `{nonce, issuedAt, expiresAt, domain, uri}`. Client signs a canonical message (`PromptPay Report v1` + domain/uri/agent/nonce/issuedAt + **`keccak256(rawBody)`** so the signature covers the payload) with its agent key; sends `x-pp-agent/nonce/issued-at/signature` headers. Server verifies via viem `verifyMessage`, single-use nonce. `resolveHumanId(agent)` = `keccak256(agent)` for now, with a marked seam for the AgentRegistry lookup.
 - **Endpoints**: `GET /health`, `GET /killswitch`, `GET /ad` (reads `board()`, eligible = active+priced+funded+creative registered, **bid-weighted random pick**, returns `{adId=creativeHash, campaignId, adText, clickUrl, pricePerSlot} + viewThresholdMs`), `POST /campaigns` (zod-validated; `creativeHash = keccak256(text + "\n" + clickUrl)` — shared formula with web; enforce on-chain ownership 403 / hash match 409), `POST /report` (units: impression=1, click=50; per-key daily cap with partial acceptance → `capped:true`; upsert into `pending`), `GET /earnings/:address`, `GET /auction`, `GET /activity`, `POST /settle/flush`.
 - **Settlement loop**: every 15s (re-entrancy latch), `takePending()` → random 32-byte `receiptId` → `settleBatch` tx signed by oracle → `waitForTransactionReceipt` → **clear pending only after confirmation** (crash-safe; on-chain replay guard makes double-submit harmless).
 
@@ -107,5 +110,4 @@ Cut-line if time runs out: Phase 5 can ship with only `/advertise/new` + `/earn`
 
 ## Reference material
 
-- Accrue research clone: `/tmp/accrue-research` (architecture only, do not copy — no license).
 - Monad docs: https://docs.monad.xyz (testnet: `developer-essentials/testnet.md`; Foundry deploy guide under `guides/deploy-smart-contract/foundry.md`).

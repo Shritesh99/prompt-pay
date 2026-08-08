@@ -36,7 +36,7 @@ node cli/bin/promptpay.mjs setup       # agent key + status line + spinner verb 
      `spinnerVerbs` setting).
 3. The daemon reports a signed impression per 15s rotation — but **only while the status line
    heartbeat is fresh** (close Claude Code and reports stop; that's the anti-phantom-billing gate).
-4. Watch it accrue: `node cli/bin/promptpay.mjs status` → `earned: $0.00xx USDC claimable`.
+4. Watch earnings climb: `node cli/bin/promptpay.mjs status` → `earned: $0.00xx USDC claimable`.
 5. Clean exit any time: `node cli/bin/promptpay.mjs uninstall` restores your previous
    status line and spinner settings exactly.
 
