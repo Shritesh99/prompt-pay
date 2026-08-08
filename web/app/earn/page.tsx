@@ -322,7 +322,7 @@ export default function EarnPage() {
             {myEvents.slice(0, 15).map((e, i) => (
               <li key={i}>
                 <span className={e.type === "click" ? "text-amber-400" : "text-emerald-400"}>{e.type}</span> · campaign #
-                {e.campaign_id} · {new Date(e.created_at).toLocaleTimeString()}
+                {e.campaign_id} · {new Date(Number(e.created_at)).toLocaleTimeString()}
               </li>
             ))}
           </ul>
