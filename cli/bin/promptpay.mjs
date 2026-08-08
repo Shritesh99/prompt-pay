@@ -9,7 +9,7 @@ import { copyFileSync, existsSync, openSync, readFileSync, rmSync, writeFileSync
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { PATHS, ensureHome, loadConfig, saveConfig } from "../src/config.mjs";
+import { PATHS, ensureHome, loadConfig, saveConfig, DEFAULT_SERVER } from "../src/config.mjs";
 import { installSettings, restoreSettings } from "../src/settings.mjs";
 import { installCodexNotify, restoreCodexNotify, CODEX_CONFIG } from "../src/codex.mjs";
 
@@ -72,7 +72,7 @@ switch (cmd) {
       console.error("--key must be a 0x-prefixed 32-byte hex private key");
       process.exit(1);
     }
-    const serverBase = flag("server") ?? loadConfig()?.serverBase ?? "http://localhost:4021";
+    const serverBase = flag("server") ?? loadConfig()?.serverBase ?? DEFAULT_SERVER;
     const payout = walletFlag();
     saveConfig({ agentPrivateKey: key, serverBase, payout });
     copyFileSync(path.join(here, "../src/statusline.mjs"), PATHS.statusline);
@@ -137,7 +137,7 @@ switch (cmd) {
       console.error("--key must be a 0x-prefixed 32-byte hex private key");
       process.exit(1);
     }
-    const serverBase = flag("server") ?? loadConfig()?.serverBase ?? "http://localhost:4021";
+    const serverBase = flag("server") ?? loadConfig()?.serverBase ?? DEFAULT_SERVER;
     const payout = walletFlag();
     saveConfig({ agentPrivateKey: key, serverBase, payout });
     const notifyScript = path.join(here, "../src/codex-notify.mjs");

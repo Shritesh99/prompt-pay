@@ -26,8 +26,12 @@ Claude Code                     PromptPay CLI daemon             Ad-server (Hono
   50/50 earner/treasury split via `AdMath`), `MockUSDC` faucet token. **23 tests.**
 - **`server/`** — Hono ad-server: serves the auction's bid-weighted winning ad, gates
   `POST /report` behind an original 402 challenge → EIP-191 signature flow (body hash bound into
-  the signed message, single-use nonces), applies per-key rolling daily caps, and settles pending
-  batches on-chain every 15s as the oracle. SQLite state.
+  the signed message, single-use nonces), applies per-key rolling daily caps, and settles on-chain
+  as the oracle. Runs locally (SQLite, 15s batch loop) for dev.
+- **`supabase/`** — the same ad-server **hosted** as a Supabase Edge Function (Deno + Hono) with
+  Postgres state. No background loop on serverless, so it **settles on report** (each event submits
+  its `settleBatch`, serialized across invocations by a Postgres advisory lock). This is the live
+  backend the CLI/web point at by default — no laptop required.
 - **`cli/`** — the earner. `promptpay setup` provisions an agent key and installs two ad surfaces
   via **supported Claude Code settings** (no patching): the `statusLine` (clickable OSC-8 ad +
   live earnings) and `spinnerVerbs` (the thinking verb *is* the ad). A daemon reports impressions
@@ -36,25 +40,36 @@ Claude Code                     PromptPay CLI daemon             Ad-server (Hono
   publish, with a resumable tx stepper), watch the live auction, track and **claim earnings**,
   leaderboard. Works with an injected wallet or a zero-setup dev wallet.
 
-## Run it
+## Earn (hosted — nothing to run)
+
+The ad-server is hosted on **Supabase** and the contracts are on **Monad testnet**, so an
+earner needs no local backend. One line:
+
+```bash
+curl -fsSL https://promptpay-monad-blitz.netlify.app/install.sh | sh -s -- --wallet 0xYourWallet
+```
+
+or with the repo checked out (defaults to the hosted backend — no `--server` needed):
+
+```bash
+node cli/bin/promptpay.mjs setup --wallet 0xYourWallet   # Claude Code: status line + thinking-verb ad
+node cli/bin/promptpay.mjs codex-setup --wallet 0xYourWallet   # Codex: per-turn sponsored notification
+node cli/bin/promptpay.mjs status                        # watch claimable USDC climb
+```
+
+Open a new `claude` (or run `codex`) and earnings settle to your wallet, claimable at
+[/earn](https://promptpay-monad-blitz.netlify.app/earn).
+
+## Local development
+
+Everything also runs locally against anvil + the Node ad-server (the same code the Supabase
+function is ported from):
 
 ```bash
 pnpm install && forge build --root contracts
-./scripts/dev-stack.sh        # anvil + contracts + ad-server + seeded campaign + web
-```
-
-Then earn in a real Claude Code session:
-
-```bash
-node cli/bin/promptpay.mjs setup     # installs the surfaces + starts the daemon
-# open a new `claude` session → the ad is the status line AND the thinking verb
-node cli/bin/promptpay.mjs status    # watch claimable USDC climb
-```
-
-Prove the whole money loop headlessly (report → settle → claim, exact split asserted on-chain):
-
-```bash
-pnpm e2e
+./scripts/dev-stack.sh                       # anvil + contracts + Node ad-server + seed + web
+node cli/bin/promptpay.mjs setup --wallet 0x… --server http://localhost:4021
+pnpm e2e                                     # report → settle → claim, exact split asserted on-chain
 ```
 
 ## Monad testnet — deployed & proven

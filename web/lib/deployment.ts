@@ -33,6 +33,6 @@ export function serverBase(): string {
   return (
     process.env.SERVER_BASE ??
     process.env.NEXT_PUBLIC_SERVER_BASE ??
-    "http://localhost:4021"
+    "https://fvwbsbbhzzxdxalyuczw.supabase.co/functions/v1/server"
   );
 }

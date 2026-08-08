@@ -4,6 +4,25 @@ Everything is real except the stablecoin (a faucet MockUSDC stands in for USDC o
 Monad testnet). The auction, escrow, signed impression reporting, oracle settlement, 50/50 split
 and claims are the production code paths on both networks.
 
+## 0. Hosted demo (nothing to run)
+
+The backend is live on **Supabase** (`https://fvwbsbbhzzxdxalyuczw.supabase.co/functions/v1/server`)
+and the site is on Netlify (https://promptpay-monad-blitz.netlify.app), so the two-sided demo works
+with no local processes:
+
+- Browse the site, launch a campaign on `/advertise/new`, watch `/auction` and `/leaderboard`.
+- Earn from any machine — no local server, no tunnel:
+  ```bash
+  curl -fsSL https://promptpay-monad-blitz.netlify.app/install.sh | sh -s -- --wallet 0xYourWallet
+  # or, in the repo (defaults to the hosted backend):
+  node cli/bin/promptpay.mjs setup --wallet 0xYourWallet
+  ```
+- Claim on `/earn` (connect the same wallet) → tx links to MonadScan.
+
+The sections below are for **local development** against anvil + the Node ad-server. The old
+`scripts/tunnel-monad.sh` (run the Node server on Monad + expose via cloudflared) is no longer
+needed now that the backend is hosted — keep it only if you want to drive the site from a laptop.
+
 ## 1. One command, whole stack (local)
 
 ```bash

@@ -3,7 +3,7 @@
 // but ONLY while the statusline heartbeat proves an ad is actually on screen.
 import { readFileSync, writeFileSync } from "node:fs";
 import { privateKeyToAccount } from "viem/accounts";
-import { PATHS, loadConfig } from "./config.mjs";
+import { PATHS, loadConfig, DEFAULT_SERVER } from "./config.mjs";
 import { updateSpinnerVerb } from "./settings.mjs";
 import { signedReport } from "./report.mjs";
 
@@ -22,7 +22,7 @@ if (!config?.agentPrivateKey) {
   process.exit(1);
 }
 const account = privateKeyToAccount(config.agentPrivateKey);
-const serverBase = config.serverBase ?? "http://localhost:4021";
+const serverBase = config.serverBase ?? DEFAULT_SERVER;
 console.log(`[daemon] agent ${account.address} → ${serverBase}`);
 
 // "<adText> → <host>" so the destination shows in the thinking verb too

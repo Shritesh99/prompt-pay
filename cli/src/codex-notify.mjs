@@ -10,7 +10,7 @@
 // Wired via ~/.codex/config.toml:  notify = ["node", "<abs>/codex-notify.mjs"]
 import { execFile } from "node:child_process";
 import { privateKeyToAccount } from "viem/accounts";
-import { loadConfig } from "./config.mjs";
+import { loadConfig, DEFAULT_SERVER } from "./config.mjs";
 import { signedReport } from "./report.mjs";
 
 async function main() {
@@ -26,7 +26,7 @@ async function main() {
   const config = loadConfig();
   if (!config?.agentPrivateKey) return;
   const account = privateKeyToAccount(config.agentPrivateKey);
-  const serverBase = config.serverBase ?? "http://localhost:4021";
+  const serverBase = config.serverBase ?? DEFAULT_SERVER;
 
   const [ks, adRes] = await Promise.all([
     fetch(`${serverBase}/killswitch`).then((r) => r.json()).catch(() => ({ killed: false })),

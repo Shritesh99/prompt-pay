@@ -21,7 +21,11 @@ export const promptpayLocal = defineChain({
 
 export const NETWORK = process.env.NEXT_PUBLIC_PP_NETWORK ?? "anvil";
 export const activeChain = NETWORK === "monad" ? monadTestnet : promptpayLocal;
-export const SERVER_BASE = process.env.NEXT_PUBLIC_SERVER_BASE ?? "http://localhost:4021";
+// Hosted ad-server (Supabase Edge Function) — the default when no override is
+// set. The web resolves the live value at runtime from /api/deployment.
+export const DEFAULT_SERVER_BASE =
+  "https://fvwbsbbhzzxdxalyuczw.supabase.co/functions/v1/server";
+export const SERVER_BASE = process.env.NEXT_PUBLIC_SERVER_BASE ?? DEFAULT_SERVER_BASE;
 
 export function explorerTx(hash: string): string | null {
   const base = activeChain.blockExplorers?.default.url;
