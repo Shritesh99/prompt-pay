@@ -1,7 +1,6 @@
 "use client";
 import Link from "next/link";
-import { SERVER_BASE } from "../lib/chains";
-import { fmtUsdc, usePoll } from "../lib/hooks";
+import { fmtUsdc, usePoll, useServerBase } from "../lib/hooks";
 
 type Auction = {
   winner: { campaignId: string; price: string } | null;
@@ -9,9 +8,11 @@ type Auction = {
 };
 
 export default function Landing() {
+  const serverBase = useServerBase();
   const auction = usePoll<Auction>(
-    () => fetch(`${SERVER_BASE}/auction`).then((r) => r.json()),
-    5000
+    () => fetch(`${serverBase}/auction`).then((r) => r.json()),
+    5000,
+    [serverBase]
   );
   const winner = auction?.winner
     ? auction.board.find((b) => b.campaignId === auction.winner!.campaignId)

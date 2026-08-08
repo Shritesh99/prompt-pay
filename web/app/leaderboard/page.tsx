@@ -1,13 +1,14 @@
 "use client";
-import { SERVER_BASE } from "../../lib/chains";
-import { usePoll } from "../../lib/hooks";
+import { usePoll, useServerBase } from "../../lib/hooks";
 
 type Receipt = { earner: string; impressions: number; clicks: number; tx_hash: string };
 
 export default function LeaderboardPage() {
+  const serverBase = useServerBase();
   const activity = usePoll<{ receipts: Receipt[] }>(
-    () => fetch(`${SERVER_BASE}/activity`).then((r) => r.json()),
-    5000
+    () => fetch(`${serverBase}/activity`).then((r) => r.json()),
+    5000,
+    [serverBase]
   );
 
   const byEarner = new Map<string, { impressions: number; clicks: number; units: number }>();

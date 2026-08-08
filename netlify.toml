@@ -1,0 +1,16 @@
+# Deploys the PromptPay web frontend (web/) from the pnpm monorepo.
+# Deploy with:  netlify deploy --build --prod --filter @promptpay/web
+# The ad-server (server/) is NOT hosted here — point the frontend at it via the
+# SERVER_BASE env var (read at runtime by /api/deployment, so a tunnel URL can
+# change without a rebuild).
+[build]
+  base = "web"
+  command = "pnpm build"
+  # publish is resolved relative to the repo root, not `base`
+  publish = "web/.next"
+
+[build.environment]
+  NEXT_PUBLIC_PP_NETWORK = "monad"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

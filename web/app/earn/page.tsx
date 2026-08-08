@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { createWalletClient, http } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { vaultAbi } from "../../lib/abis";
-import { SERVER_BASE, activeChain } from "../../lib/chains";
-import { fmtUsdc, publicClient, useDeployment, usePoll } from "../../lib/hooks";
+import { activeChain } from "../../lib/chains";
+import { fmtUsdc, publicClient, useDeployment, usePoll, useServerBase } from "../../lib/hooks";
 
 const STORAGE_KEY = "promptpay.agentKey";
 
@@ -21,17 +21,20 @@ export default function EarnPage() {
   }, []);
 
   const account = agentKey ? privateKeyToAccount(agentKey) : null;
+  const serverBase = useServerBase();
 
   const earnings = usePoll<{ claimable: string; pendingUnits: number } | null>(
     async () =>
       account
-        ? fetch(`${SERVER_BASE}/earnings/${account.address}`).then((r) => r.json())
+        ? fetch(`${serverBase}/earnings/${account.address}`).then((r) => r.json())
         : null,
-    4000
+    4000,
+    [serverBase, account?.address]
   );
   const activity = usePoll<{ events: { type: string; campaign_id: string; earner: string; created_at: number }[] }>(
-    () => fetch(`${SERVER_BASE}/activity`).then((r) => r.json()),
-    4000
+    () => fetch(`${serverBase}/activity`).then((r) => r.json()),
+    4000,
+    [serverBase]
   );
 
   function adoptKey(key: string) {
@@ -139,7 +142,7 @@ export default function EarnPage() {
               Set up the Claude Code earner
             </h2>
             <pre className="overflow-x-auto rounded-lg bg-zinc-900 p-4 text-sm text-zinc-300">
-              {`node cli/bin/promptpay.mjs setup --key ${agentKey} --server ${SERVER_BASE}`}
+              {`node cli/bin/promptpay.mjs setup --key ${agentKey} --server ${serverBase}`}
             </pre>
             <p className="mt-2 text-xs text-zinc-500">
               Then open a new <code>claude</code> session — the ad shows in the status line and the

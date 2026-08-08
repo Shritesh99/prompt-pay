@@ -1,6 +1,5 @@
 "use client";
-import { SERVER_BASE } from "../../lib/chains";
-import { fmtUsdc, usePoll } from "../../lib/hooks";
+import { fmtUsdc, usePoll, useServerBase } from "../../lib/hooks";
 
 type Auction = {
   winner: { campaignId: string; price: string } | null;
@@ -15,9 +14,11 @@ type Auction = {
 };
 
 export default function AuctionPage() {
+  const serverBase = useServerBase();
   const auction = usePoll<Auction>(
-    () => fetch(`${SERVER_BASE}/auction`).then((r) => r.json()),
-    4000
+    () => fetch(`${serverBase}/auction`).then((r) => r.json()),
+    4000,
+    [serverBase]
   );
   const board = (auction?.board ?? []).slice().sort((a, b) => Number(b.pricePerSlot) - Number(a.pricePerSlot));
 

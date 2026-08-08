@@ -12,7 +12,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { useAccount } from "wagmi";
-import { activeChain } from "./chains";
+import { activeChain, SERVER_BASE } from "./chains";
 import type { Deployment } from "./deployment";
 
 export const publicClient = createPublicClient({ chain: activeChain, transport: http() });
@@ -31,6 +31,28 @@ export function useDeployment(): Deployment | null {
       .catch(() => {});
   }, []);
   return deployment;
+}
+
+// The ad-server base URL is delivered at runtime by /api/deployment (so a
+// tunnel URL can change without a rebuild). Cached across the app after the
+// first fetch; falls back to the build-time default until it resolves.
+let cachedServerBase: string | null = null;
+
+export function useServerBase(): string {
+  const [base, setBase] = useState<string>(cachedServerBase ?? SERVER_BASE);
+  useEffect(() => {
+    if (cachedServerBase) return;
+    fetch("/api/deployment")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.serverBase) {
+          cachedServerBase = d.serverBase;
+          setBase(d.serverBase);
+        }
+      })
+      .catch(() => {});
+  }, []);
+  return base;
 }
 
 export type Signer = { walletClient: WalletClient; address: Address; kind: "injected" | "dev" };
@@ -69,7 +91,7 @@ export function useSigner(): {
   return { signer, useDevWallet };
 }
 
-export function usePoll<T>(fn: () => Promise<T>, intervalMs: number): T | null {
+export function usePoll<T>(fn: () => Promise<T>, intervalMs: number, deps: unknown[] = []): T | null {
   const [value, setValue] = useState<T | null>(null);
   useEffect(() => {
     let alive = true;
@@ -81,7 +103,7 @@ export function usePoll<T>(fn: () => Promise<T>, intervalMs: number): T | null {
       clearInterval(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intervalMs]);
+  }, [intervalMs, ...deps]);
   return value;
 }
 

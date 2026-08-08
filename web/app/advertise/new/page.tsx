@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { keccak256, parseEventLogs, toHex } from "viem";
 import { usdcAbi, vaultAbi, auctionAbi } from "../../../lib/abis";
-import { SERVER_BASE, activeChain } from "../../../lib/chains";
-import { fmtUsdc, publicClient, useDeployment, useSigner } from "../../../lib/hooks";
+import { activeChain } from "../../../lib/chains";
+import { fmtUsdc, publicClient, useDeployment, useServerBase, useSigner } from "../../../lib/hooks";
 
 type StepState = "idle" | "running" | "done" | "error";
 const STEPS = [
@@ -18,6 +18,7 @@ const STEPS = [
 export default function NewCampaign() {
   const deployment = useDeployment();
   const { signer, useDevWallet } = useSigner();
+  const serverBase = useServerBase();
 
   const [text, setText] = useState("");
   const [clickUrl, setClickUrl] = useState("https://");
@@ -128,7 +129,7 @@ export default function NewCampaign() {
 
       // 5: publish creative
       setStep(step, "running");
-      const pub = await fetch(`${SERVER_BASE}/campaigns`, {
+      const pub = await fetch(`${serverBase}/campaigns`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

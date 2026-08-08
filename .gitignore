@@ -16,8 +16,13 @@ server/data/
 web/.next/
 web/out/
 
-# secrets — never commit operator keys
+# secrets — never commit key material (operator/faucet). monad.json (public
+# addresses) is intentionally NOT matched by these patterns.
 contracts/deployments/*-operator.json
+contracts/deployments/*-faucet.json
 
 # extension build output
 extension/dist/
+
+# netlify
+.netlify/
